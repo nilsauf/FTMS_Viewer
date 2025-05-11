@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FTMS_Viewer.Pages.ControlPage"
+			 xmlns:l="clr-namespace:FTMS_Viewer.Pages"
+			 xmlns:c="clr-namespace:CommunityToolkit.Mvvm.Input;assembly=CommunityToolkit.Mvvm"
+			 x:DataType="l:ControlViewModel"
+             Title="ControlPage">
+
+	<VerticalStackLayout>
+        <Label Text="Not Connected!"
+			   VerticalOptions="Center" 
+               HorizontalOptions="Center"
+               Margin="10"
+			   IsVisible="{Binding IsConnected}"/>
+		
+		
+    </VerticalStackLayout>
+</ContentPage>

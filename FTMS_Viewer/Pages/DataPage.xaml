@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+			 xmlns:l="clr-namespace:FTMS_Viewer.Pages"
+			 xmlns:ftmsData="clr-namespace:FTMS.NET.Data;assembly=FTMS.NET.Contracts"
+             x:Class="FTMS_Viewer.Pages.DataPage"
+             Title="Data"
+			 x:DataType="l:DataViewModel">
+	<VerticalStackLayout BindableLayout.ItemsSource="{Binding Values}"
+			  Margin="5">
+		<BindableLayout.ItemTemplate>
+			<DataTemplate x:DataType="ftmsData:IFitnessMachineValue">
+				<Border StrokeThickness="2" StrokeShape="RoundRectangle 10,10,10,10" Margin="2,5,2,2">
+					<VerticalStackLayout Margin="5">
+						<Label Text="{Binding Name, Mode=OneWay}"
+							   HorizontalTextAlignment="Center" />
+						<Label Text="{Binding Value, Mode=OneWay}" 
+						   FontSize="Large"
+						   HorizontalTextAlignment="Center" />
+					</VerticalStackLayout>
+				</Border>
+			</DataTemplate>
+		</BindableLayout.ItemTemplate>
+	</VerticalStackLayout>
+</ContentPage>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+			 xmlns:l="clr-namespace:FTMS_Viewer.Pages"
+             x:Class="FTMS_Viewer.Pages.FeaturesPage"
+			 x:DataType="l:FeaturesViewModel"
+             Title="Features">
+	<ScrollView>
+		<VerticalStackLayout>
+			
+			<Label Text="{Binding Type}"
+				   VerticalOptions="Center" 
+				   HorizontalOptions="Center"
+				   Margin="10"/>
+			
+			<FlexLayout BindableLayout.ItemsSource="{Binding Flags}"
+						Direction="Row"
+						AlignItems="Start"
+						AlignContent="Start"
+						Wrap="Wrap"
+						JustifyContent="SpaceAround">
+				<BindableLayout.ItemTemplate>
+					<DataTemplate x:DataType="l:NamedFlagValue">
+						<Border StrokeThickness="2" StrokeShape="RoundRectangle 10,10,10,10" Margin="2">
+							<VerticalStackLayout Margin="5">
+								<Label Text="{Binding Name, Mode=OneTime}" />
+								<Label Text="{Binding ValueString, Mode=OneTime}" 
+									   FontSize="Large"
+									   TextColor="{Binding ValueColor, Mode=OneTime}"
+									   HorizontalTextAlignment="Center" />
+							</VerticalStackLayout>
+						</Border>
+					</DataTemplate>
+				</BindableLayout.ItemTemplate>
+			</FlexLayout>
+			
+			<VerticalStackLayout BindableLayout.ItemsSource="{Binding Ranges}">
+				<BindableLayout.ItemTemplate>
+					<DataTemplate x:DataType="l:RangeValue">
+						<Border StrokeThickness="2" StrokeShape="RoundRectangle 10,10,10,10" Margin="2">
+							<VerticalStackLayout Margin="5">
+								<Label Text="{Binding Name, Mode=OneTime}"
+									   HorizontalTextAlignment="Center" 
+									   VerticalTextAlignment="Center" />
+								<Label Text="Not Supported" 
+									   TextColor="Red" 
+									   IsVisible="{Binding NotSupported, Mode=OneTime}" 
+									   HorizontalTextAlignment="Center" 
+									   VerticalTextAlignment="Center"/>
+								<HorizontalStackLayout IsVisible="{Binding Supported, Mode=OneTime}" 
+													   HorizontalOptions="Center" 
+													   Spacing="10">
+									<VerticalStackLayout>
+										<Label Text="Min"
+											   HorizontalTextAlignment="Center" 
+											   VerticalTextAlignment="Center" />
+										<Label Text="{Binding Range.MinimumValue, Mode=OneTime}"
+											   FontSize="Medium"
+											   HorizontalTextAlignment="Center" 
+											   VerticalTextAlignment="Center" />
+									</VerticalStackLayout>
+									<VerticalStackLayout>
+										<Label Text="Max" 
+											   HorizontalTextAlignment="Center" 
+											   VerticalTextAlignment="Center" />
+										<Label Text="{Binding Range.MaximumValue, Mode=OneTime}"
+											   FontSize="Medium"
+											   HorizontalTextAlignment="Center" 
+											   VerticalTextAlignment="Center" />
+									</VerticalStackLayout>
+									<VerticalStackLayout>
+										<Label Text="MinStep" 
+											   HorizontalTextAlignment="Center" 
+											   VerticalTextAlignment="Center" />
+										<Label Text="{Binding Range.MinimumIncrement, Mode=OneTime}"
+											   FontSize="Medium"
+											   HorizontalTextAlignment="Center" 
+											   VerticalTextAlignment="Center" />
+									</VerticalStackLayout>
+								</HorizontalStackLayout>
+							</VerticalStackLayout>
+						</Border>
+					</DataTemplate>
+				</BindableLayout.ItemTemplate>
+			</VerticalStackLayout>
+		</VerticalStackLayout>
+	</ScrollView>
+</ContentPage>

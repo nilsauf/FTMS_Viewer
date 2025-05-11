@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+			 xmlns:l="clr-namespace:FTMS_Viewer.Pages"
+			 xmlns:ble="clr-namespace:Plugin.BLE.Abstractions.Contracts;assembly=Plugin.BLE"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="FTMS_Viewer.Pages.ConnectionPage"
+			 x:DataType="l:ConnectionViewModel"
+             Title="Connection">
+	
+	<ContentPage.Resources>
+		<Style TargetType="Border">
+			<Setter Property="VisualStateManager.VisualStateGroups">
+				<VisualStateGroupList>
+					<VisualStateGroup x:Name="CommonStates">
+						<VisualState x:Name="Normal" />
+						<VisualState x:Name="Selected">
+							<VisualState.Setters>
+								<Setter Property="BackgroundColor"
+                                    Value="{StaticResource Primary}" />
+							</VisualState.Setters>
+						</VisualState>
+					</VisualStateGroup>
+				</VisualStateGroupList>
+			</Setter>
+		</Style>
+
+		<toolkit:BoolToObjectConverter x:Key="IsSelectionPossibleConverter" 
+            TrueObject="{x:Static SelectionMode.Single}" 
+            FalseObject="{x:Static SelectionMode.None}"/>
+
+	</ContentPage.Resources>
+
+	<VerticalStackLayout>
+		<Label Text="{Binding UserPrompt}"
+			   HorizontalTextAlignment="Center" VerticalTextAlignment="Center"
+			   FontSize="Medium" 
+			   Margin="10" />
+		<Button Text="Disconnect"
+				Command="{Binding DisconnectCommand}"
+				IsVisible="{Binding Connected}"
+				Margin="10" />
+		<CollectionView ItemsSource="{Binding Devices}" 
+					Margin="10"
+					x:Name="DevicesView"
+					SelectionMode="{Binding SelectionPossible, Converter={StaticResource IsSelectionPossibleConverter}}"
+					SelectionChangedCommand="{Binding ConnectCommand}"
+					SelectionChangedCommandParameter="{Binding SelectedItem, Source={RelativeSource Self}, x:DataType=CollectionView}">
+			<CollectionView.ItemTemplate>
+				<DataTemplate x:DataType="ble:IDevice">
+					<Border StrokeShape="RoundRectangle 10,10,10,10" BackgroundColor="{StaticResource PrimaryDark}" HeightRequest="50">
+						<Label Text="{Binding Name}" 
+						   TextColor="{StaticResource PrimaryDarkText}"
+						   Margin="10"
+						   FontSize="Medium" FontAttributes="Bold"
+						   HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
+					</Border>
+				</DataTemplate>
+			</CollectionView.ItemTemplate>
+		</CollectionView>
+		<ActivityIndicator IsRunning="{Binding BluetoothAvailable}" Color="{StaticResource PrimaryDark}" />
+	</VerticalStackLayout>
+</ContentPage>

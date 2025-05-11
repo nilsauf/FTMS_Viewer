@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+			 xmlns:l="clr-namespace:FTMS_Viewer.Pages"
+			 xmlns:debugLog="clr-namespace:FTMS_Viewer.DebugLog"
+			 xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="FTMS_Viewer.Pages.FlyoutDebugLogPage"
+			 x:DataType="l:FlyoutDebugLogViewModel"
+			 Padding="6">
+
+	<ScrollView>
+		<CollectionView ItemsSource="{Binding Items}"
+						x:Name="MyCollectionView"
+						Grid.Row="1"
+						HorizontalOptions="Start"
+						VerticalOptions="Start"
+						SelectionMode="Single"
+						SelectionChanged="MyCollectionView_SelectionChanged"
+						SelectionChangedCommand="{Binding ShowItemsToastCommand}"
+						SelectionChangedCommandParameter="{Binding SelectedItem, Source={x:Reference MyCollectionView}}">
+			<CollectionView.Header>
+				<Label Text="FTMS Viewer Log"
+					   Margin="5"
+					   VerticalTextAlignment="Center" HorizontalTextAlignment="Center" />
+			</CollectionView.Header>
+			<CollectionView.ItemTemplate>
+				<DataTemplate x:DataType="debugLog:DebugLogItem">
+					<VerticalStackLayout Margin="5">
+						<Label Text="{Binding FormattedMessage}"
+							   FontSize="12"
+							   HorizontalTextAlignment="Start"
+							   VerticalTextAlignment="Center"
+							   LineBreakMode="WordWrap" />
+						<Label Text="{Binding ExceptionName}"
+							   FontSize="10"
+							   HorizontalTextAlignment="Start"
+							   VerticalTextAlignment="Center"
+							   LineBreakMode="WordWrap"
+							   IsVisible="{Binding ExceptionName, Converter={toolkit:IsStringNotNullOrWhiteSpaceConverter}}">
+						</Label>
+					</VerticalStackLayout>
+					
+				</DataTemplate>
+			</CollectionView.ItemTemplate>
+		</CollectionView>
+	</ScrollView>
+
+</ContentView>

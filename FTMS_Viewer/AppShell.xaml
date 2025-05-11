@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+	   xmlns:pages="clr-namespace:FTMS_Viewer.Pages"
+	   xmlns:l="clr-namespace:FTMS_Viewer"
+       x:Class="FTMS_Viewer.AppShell"
+	   FlyoutHeaderBehavior="CollapseOnScroll"
+	   FlyoutBehavior="Flyout"
+       Title="AppShell"
+	   x:DataType="l:AppShell">
+
+	<TabBar>
+		<ShellContent
+			ContentTemplate="{DataTemplate pages:ConnectionPage}"
+			Title="Connection" />
+		<ShellContent
+			ContentTemplate="{DataTemplate pages:FeaturesPage}"
+			Title="Features" />
+		<ShellContent
+			ContentTemplate="{DataTemplate pages:DataPage}"
+			Title="Data" />
+		<ShellContent
+			ContentTemplate="{DataTemplate pages:ControlPage}"
+			Title="Control" />
+	</TabBar>
+
+	<Shell.FlyoutContentTemplate>
+		<DataTemplate>
+			<pages:FlyoutDebugLogPage BindingContext="{Binding LogViewModel}" />
+		</DataTemplate>
+	</Shell.FlyoutContentTemplate>
+
+</Shell>
