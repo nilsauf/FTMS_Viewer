@@ -21,6 +21,10 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	[ObservableProperty]
 	[NotifyPropertyChangedFor(nameof(this.IsConnected))]
 	[NotifyCanExecuteChangedFor(nameof(this.RequestControlCommand))]
+	[NotifyCanExecuteChangedFor(nameof(this.ResetCommand))]
+	[NotifyCanExecuteChangedFor(nameof(this.StartOrResumeCommand))]
+	[NotifyCanExecuteChangedFor(nameof(this.StopCommand))]
+	[NotifyCanExecuteChangedFor(nameof(this.PauseCommand))]
 	private partial IFitnessMachineControl? Control { get; set; }
 
 	public bool IsConnected => this.Control is not null;
@@ -38,7 +42,6 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
 	private async Task RequestControlAsync()
 	{
-		this.RequestControlCommand
 		await this.Control!.RequestControl();
 	}
 
