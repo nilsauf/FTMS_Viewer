@@ -7,13 +7,28 @@
 			 x:DataType="l:ControlViewModel"
              Title="ControlPage">
 
-	<VerticalStackLayout>
-        <Label Text="Not Connected!"
-			   VerticalOptions="Center" 
-               HorizontalOptions="Center"
-               Margin="10"
-			   IsVisible="{Binding IsConnected}"/>
+	<ContentPage.Resources>
+		<Style TargetType="Button">
+			<Setter Property="HeightRequest" Value="70" />
+			<Setter Property="FontSize" Value="20" />
+			<Setter Property="CornerRadius" Value="15" />
+		</Style>
+	</ContentPage.Resources>
+
+	<ScrollView>
+		<VerticalStackLayout Spacing="20" Margin="20">
+
+			<Button Text="Request Control" Command="{Binding RequestControlCommand}" />
+
+			<Button Text="Reset" Command="{Binding ResetCommand}" />
+
+			<Button Text="Start Or Resume" Command="{Binding StartOrResumeCommand}" />
+
+			<Button Text="Stop" Command="{Binding StopCommand}" />
+
+			<Button Text="Pause" Command="{Binding PauseCommand}" />
+
+		</VerticalStackLayout>
+	</ScrollView>
 		
-		
-    </VerticalStackLayout>
 </ContentPage>
