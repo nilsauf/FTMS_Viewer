@@ -2,6 +2,7 @@
 
 using System;
 using System.Reactive.Linq;
+using System.Runtime.CompilerServices;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -25,6 +26,7 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	[NotifyCanExecuteChangedFor(nameof(this.StartOrResumeCommand))]
 	[NotifyCanExecuteChangedFor(nameof(this.StopCommand))]
 	[NotifyCanExecuteChangedFor(nameof(this.PauseCommand))]
+	[NotifyCanExecuteChangedFor(nameof(this.SetTargetPowerCommand))]
 	private partial IFitnessMachineControl? Control { get; set; }
 
 	public bool IsConnected => this.Control is not null;
@@ -42,31 +44,37 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
 	private async Task RequestControlAsync()
 	{
-		await this.Control!.RequestControl();
+		await this.RunSafely(this.Control!.RequestControl);
 	}
 
 	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
 	private async Task ResetAsync()
 	{
-		await this.Control!.Reset();
+		await this.RunSafely(this.Control!.Reset);
 	}
 
 	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
 	private async Task StartOrResumeAsync()
 	{
-		await this.Control!.StartOrResume();
+		await this.RunSafely(this.Control!.StartOrResume);
 	}
 
 	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
 	private async Task StopAsync()
 	{
-		await this.Control!.Stop();
+		await this.RunSafely(this.Control!.Stop);
 	}
 
 	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
 	private async Task PauseAsync()
 	{
-		await this.Control!.Pause();
+		await this.RunSafely(this.Control!.Pause);
+	}
+
+	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
+	private async Task SetTargetPowerAsync(short power)
+	{
+		await this.RunSafely(() => this.Control!.SetTargetPower(power));
 	}
 
 	private bool CanSendRequest() => this.IsConnected;
@@ -75,4 +83,20 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	{
 		this.cleanUp.Dispose();
 	}
+
+	private async Task RunSafely(Func<Task> run, [CallerMemberName] string callerName = "No name set")
+	{
+		try
+		{
+			await run();
+		}
+		catch (Exception ex)
+		{
+			string commandName = callerName.Replace("Async", string.Empty);
+			this.LogErrorExecutingCommand(commandName, ex);
+		}
+	}
+
+	[LoggerMessage(LogLevel.Error, "Error while executing command: {CommandName}")]
+	private partial void LogErrorExecutingCommand(string commandName, Exception ex);
 }
