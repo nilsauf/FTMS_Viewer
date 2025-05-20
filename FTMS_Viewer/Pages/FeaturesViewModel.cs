@@ -24,6 +24,7 @@ using Plugin.BLE.FTMS;
 public sealed partial class FeaturesViewModel : ObservableObject, IDisposable
 {
 	private const string NotConnected = "Not Connected";
+	private const string Reading = "Reading Features...";
 
 	private readonly IConnectionManager connectionManager;
 	private readonly ILogger<FeaturesViewModel> logger;
@@ -44,6 +45,7 @@ public sealed partial class FeaturesViewModel : ObservableObject, IDisposable
 		this.connectionManager = connectionManager;
 		this.logger = logger;
 		this.cleanUp = connectionManager.ObserveCurrentServiceConnection()
+			.Do(connection => this.Type = connection is null ? NotConnected : Reading)
 			.SelectMany(this.ReadFeaturesAsync)
 			.RetryAndDisconnect(connectionManager)
 			.ObserveOn(SynchronizationContext.Current!)
