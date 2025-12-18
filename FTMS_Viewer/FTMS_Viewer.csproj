@@ -22,7 +22,8 @@
 		<Nullable>enable</Nullable>
 		<LangVersion>preview</LangVersion>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<MauiEnableXamlCBindingWithSourceCompilation>false</MauiEnableXamlCBindingWithSourceCompilation>
+		<MauiEnableXamlCBindingWithSourceCompilation>true</MauiEnableXamlCBindingWithSourceCompilation>
+		<MauiXamlInflator>SourceGen</MauiXamlInflator>
 
 		<!-- Display name -->
 		<ApplicationTitle>FTMS Viewer</ApplicationTitle>
