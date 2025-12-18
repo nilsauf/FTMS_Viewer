@@ -7,9 +7,10 @@ public sealed partial class FlyoutDebugLogPage : ContentView, IDisposable
 {
 	private readonly SerialDisposable deselectSubscription = new();
 
-	public FlyoutDebugLogPage()
+	public FlyoutDebugLogPage(FlyoutDebugLogViewModel logViewModel)
 	{
 		this.InitializeComponent();
+		this.BindingContext = logViewModel;
 	}
 
 	public void Dispose()

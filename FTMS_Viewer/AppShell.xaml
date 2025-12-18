@@ -24,10 +24,4 @@
 			Title="Control" />
 	</TabBar>
 
-	<Shell.FlyoutContentTemplate>
-		<DataTemplate>
-			<pages:FlyoutDebugLogPage BindingContext="{Binding LogViewModel}" />
-		</DataTemplate>
-	</Shell.FlyoutContentTemplate>
-
 </Shell>
