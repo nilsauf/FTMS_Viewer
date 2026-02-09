@@ -44,10 +44,10 @@ public sealed partial class FeaturesViewModel : ObservableObject, IDisposable
 	{
 		this.connectionManager = connectionManager;
 		this.logger = logger;
-		this.cleanUp = connectionManager.ObserveCurrentServiceConnection()
-			.Do(connection => this.Type = connection is null ? NotConnected : Reading)
-			.SelectMany(this.ReadFeaturesAsync)
-			.RetryAndDisconnect(connectionManager)
+		this.cleanUp = connectionManager.ObserveCurrentServiceConnection(
+				s => s.Do(connection => this.Type = connection is null ? NotConnected : Reading)
+					.SelectMany(this.ReadFeaturesAsync),
+				10)
 			.ObserveOn(SynchronizationContext.Current!)
 			.Subscribe(
 				this.SetData,

@@ -34,9 +34,9 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	public ControlViewModel(IConnectionManager connectionManager, ILogger<ControlViewModel> logger)
 	{
 		this.logger = logger;
-		this.cleanUp = connectionManager.ObserveCurrentServiceConnection()
-			.SelectMany(async c => c is not null ? await c.CreateFitnessMachineControlAsync() : null)
-			.RetryAndDisconnect(connectionManager)
+		this.cleanUp = connectionManager.ObserveCurrentServiceConnection(
+				s => s.SelectMany(async c => c is not null ? await c.CreateFitnessMachineControlAsync() : null),
+				10)
 			.ObserveOn(SynchronizationContext.Current!)
 			.Subscribe(control => this.Control = control);
 	}

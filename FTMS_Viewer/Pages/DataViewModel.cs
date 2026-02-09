@@ -24,9 +24,9 @@ public sealed partial class DataViewModel : IDisposable
 	public DataViewModel(IConnectionManager connectionManager, ILogger<DataViewModel> logger)
 	{
 		var dataObservable = connectionManager
-			.ObserveCurrentServiceConnection()
-			.SelectMany(async c => c is not null ? await c.CreateFitnessMachineDataAsync() : null)
-			.RetryAndDisconnect(connectionManager)
+			.ObserveCurrentServiceConnection(
+				s => s.SelectMany(async c => c is not null ? await c.CreateFitnessMachineDataAsync() : null),
+				10)
 			.Replay(1)
 			.AutoConnect();
 
