@@ -20,13 +20,13 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	private readonly ILogger<ControlViewModel> logger;
 
 	[ObservableProperty]
-	[NotifyPropertyChangedFor(nameof(this.IsConnected))]
-	[NotifyCanExecuteChangedFor(nameof(this.RequestControlCommand))]
-	[NotifyCanExecuteChangedFor(nameof(this.ResetCommand))]
-	[NotifyCanExecuteChangedFor(nameof(this.StartOrResumeCommand))]
-	[NotifyCanExecuteChangedFor(nameof(this.StopCommand))]
-	[NotifyCanExecuteChangedFor(nameof(this.PauseCommand))]
-	[NotifyCanExecuteChangedFor(nameof(this.SetTargetPowerCommand))]
+	[NotifyPropertyChangedFor(nameof(IsConnected))]
+	[NotifyCanExecuteChangedFor(nameof(RequestControlCommand))]
+	[NotifyCanExecuteChangedFor(nameof(ResetCommand))]
+	[NotifyCanExecuteChangedFor(nameof(StartOrResumeCommand))]
+	[NotifyCanExecuteChangedFor(nameof(StopCommand))]
+	[NotifyCanExecuteChangedFor(nameof(PauseCommand))]
+	[NotifyCanExecuteChangedFor(nameof(SetTargetPowerCommand))]
 	private partial IFitnessMachineControl? Control { get; set; }
 
 	public bool IsConnected => this.Control is not null;
@@ -41,37 +41,37 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 			.Subscribe(control => this.Control = control);
 	}
 
-	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
+	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private async Task RequestControlAsync()
 	{
 		await this.RunSafely(this.Control!.RequestControl);
 	}
 
-	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
+	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private async Task ResetAsync()
 	{
 		await this.RunSafely(this.Control!.Reset);
 	}
 
-	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
+	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private async Task StartOrResumeAsync()
 	{
 		await this.RunSafely(this.Control!.StartOrResume);
 	}
 
-	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
+	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private async Task StopAsync()
 	{
 		await this.RunSafely(this.Control!.Stop);
 	}
 
-	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
+	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private async Task PauseAsync()
 	{
 		await this.RunSafely(this.Control!.Pause);
 	}
 
-	[RelayCommand(CanExecute = nameof(this.CanSendRequest))]
+	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private async Task SetTargetPowerAsync(short power)
 	{
 		await this.RunSafely(() => this.Control!.SetTargetPower(power));

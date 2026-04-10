@@ -22,14 +22,14 @@ public sealed partial class ConnectionViewModel : ObservableObject, IDisposable
 	public IObservableCollection<IDevice> Devices => this.devices;
 
 	[ObservableProperty]
-	[NotifyPropertyChangedFor(nameof(this.UserPrompt))]
-	[NotifyPropertyChangedFor(nameof(this.SelectionPossible))]
+	[NotifyPropertyChangedFor(nameof(UserPrompt))]
+	[NotifyPropertyChangedFor(nameof(SelectionPossible))]
 	public partial bool BluetoothAvailable { get; set; }
 
 	[ObservableProperty]
-	[NotifyPropertyChangedFor(nameof(this.UserPrompt))]
-	[NotifyCanExecuteChangedFor(nameof(this.DisconnectCommand))]
-	[NotifyCanExecuteChangedFor(nameof(this.ConnectCommand))]
+	[NotifyPropertyChangedFor(nameof(UserPrompt))]
+	[NotifyCanExecuteChangedFor(nameof(DisconnectCommand))]
+	[NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
 	public partial bool Connected { get; set; }
 
 	public string UserPrompt => this.BluetoothAvailable ?
