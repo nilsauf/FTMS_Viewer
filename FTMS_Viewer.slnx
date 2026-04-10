@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Solution Items/" />
+  <Folder Name="/Solution Items/.github/">
+    <File Path=".github/dependabot.yml" />
+  </Folder>
+  <Project Path="FTMS_Viewer/FTMS_Viewer.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
+</Solution>
