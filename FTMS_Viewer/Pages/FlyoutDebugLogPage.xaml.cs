@@ -16,7 +16,7 @@ public sealed partial class FlyoutDebugLogPage : ContentView, IDisposable
 	public void Dispose()
 		=> this.deselectSubscription.Dispose();
 
-	private void MyCollectionView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+	private void MyCollectionView_SelectionChanged(object? sender, SelectionChangedEventArgs e)
 	{
 		if (e.CurrentSelection is null || e.CurrentSelection.Count is 0)
 			return;

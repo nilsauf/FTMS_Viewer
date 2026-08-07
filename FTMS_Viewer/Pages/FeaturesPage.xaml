@@ -25,7 +25,7 @@
 							<VerticalStackLayout Margin="5">
 								<Label Text="{Binding Name, Mode=OneTime}" />
 								<Label Text="{Binding ValueString, Mode=OneTime}" 
-									   FontSize="Large"
+									   FontSize="18"
 									   TextColor="{Binding ValueColor, Mode=OneTime}"
 									   HorizontalTextAlignment="Center" />
 							</VerticalStackLayout>
@@ -55,7 +55,7 @@
 											   HorizontalTextAlignment="Center" 
 											   VerticalTextAlignment="Center" />
 										<Label Text="{Binding Range.MinimumValue, Mode=OneTime}"
-											   FontSize="Medium"
+											   FontSize="14"
 											   HorizontalTextAlignment="Center" 
 											   VerticalTextAlignment="Center" />
 									</VerticalStackLayout>
@@ -64,7 +64,7 @@
 											   HorizontalTextAlignment="Center" 
 											   VerticalTextAlignment="Center" />
 										<Label Text="{Binding Range.MaximumValue, Mode=OneTime}"
-											   FontSize="Medium"
+											   FontSize="14"
 											   HorizontalTextAlignment="Center" 
 											   VerticalTextAlignment="Center" />
 									</VerticalStackLayout>
@@ -73,7 +73,7 @@
 											   HorizontalTextAlignment="Center" 
 											   VerticalTextAlignment="Center" />
 										<Label Text="{Binding Range.MinimumIncrement, Mode=OneTime}"
-											   FontSize="Medium"
+											   FontSize="14"
 											   HorizontalTextAlignment="Center" 
 											   VerticalTextAlignment="Center" />
 									</VerticalStackLayout>

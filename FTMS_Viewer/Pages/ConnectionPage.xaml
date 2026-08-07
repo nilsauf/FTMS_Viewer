@@ -34,8 +34,8 @@
 	<VerticalStackLayout>
 		<Label Text="{Binding UserPrompt}"
 			   HorizontalTextAlignment="Center" VerticalTextAlignment="Center"
-			   FontSize="Medium" 
-			   Margin="10" />
+		   FontSize="14" 
+		   Margin="10" />
 		<Button Text="Disconnect"
 				Command="{Binding DisconnectCommand}"
 				IsVisible="{Binding Connected}"
@@ -52,7 +52,7 @@
 						<Label Text="{Binding Name}" 
 						   TextColor="{StaticResource PrimaryDarkText}"
 						   Margin="10"
-						   FontSize="Medium" FontAttributes="Bold"
+						   FontSize="14" FontAttributes="Bold"
 						   HorizontalTextAlignment="Center" VerticalTextAlignment="Center" />
 					</Border>
 				</DataTemplate>

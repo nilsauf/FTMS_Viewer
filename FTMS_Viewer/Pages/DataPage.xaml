@@ -15,7 +15,7 @@
 						<Label Text="{Binding Name, Mode=OneWay}"
 							   HorizontalTextAlignment="Center" />
 						<Label Text="{Binding Value, Mode=OneWay}" 
-						   FontSize="Large"
+						   FontSize="18"
 						   HorizontalTextAlignment="Center" />
 					</VerticalStackLayout>
 				</Border>
