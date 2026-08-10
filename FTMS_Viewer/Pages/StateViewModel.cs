@@ -1,6 +1,7 @@
 namespace FTMS_Viewer.Pages;
 
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
@@ -19,6 +20,7 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 	private const string NotConnected = "Not Connected";
 	private const int HistoryCapacity = 3;
 	private const double HistoryOpacityStep = 0.25;
+	private const int MachineStateLogCapacity = 100;
 
 	private readonly ILogger<StateViewModel> logger;
 	private readonly IDisposable cleanUp;
@@ -38,6 +40,8 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 	public partial string CurrentDetails { get; private set; } = string.Empty;
 
 	public ObservableCollection<TrainingStateTileItem> TrainingStateHistory { get; } = [];
+
+	public ObservableCollection<MachineStateLogItem> MachineStateLog { get; } = [];
 
 	public bool IsDetailsVisible => !string.IsNullOrEmpty(this.CurrentDetails);
 
@@ -104,7 +108,64 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 	}
 
 	private void HandleMachineState(IFitnessMachineState state)
-		=> this.logger.LogDebug("Received machine state notification: {OpCode}", state.OpCode);
+	{
+		this.logger.LogDebug("Received machine state notification: {OpCode}", state.OpCode);
+		this.AppendMachineStateLogEntry(state);
+	}
+
+	private void AppendMachineStateLogEntry(IFitnessMachineState state)
+	{
+		string opCodeName = state.OpCode.ToString().AddSpacesBetweenWords();
+		string parameters;
+		try
+		{
+			parameters = string.Join(", ", state.ReadParameters().Select(FormatParameter));
+		}
+		catch (KeyNotFoundException)
+		{
+			this.logger.LogWarning("Received machine-state notification with unknown opcode {OpCode}", state.OpCode);
+			opCodeName = $"Unknown Opcode (0x{(byte)state.OpCode:X2})";
+			parameters = string.Empty;
+		}
+
+		this.MachineStateLog.Add(new MachineStateLogItem(opCodeName, parameters, FormatRawData(state.OpCode, state.RawData)));
+		if (this.MachineStateLog.Count > MachineStateLogCapacity)
+			this.MachineStateLog.RemoveAt(0);
+	}
+
+	private static string FormatParameter(object parameter)
+		=> parameter switch
+		{
+			FitnessMachineStateParameter p => string.Concat(
+				p.Name, ": ", FormatValue(p.Value), FormatUnit(p.Unit)),
+			Enum e => e.ToString().AddSpacesBetweenWords(),
+			_ => parameter.ToString() ?? string.Empty,
+		};
+
+	private static string FormatValue(double value)
+		=> value.ToString("0.###", CultureInfo.InvariantCulture);
+
+	private static string FormatUnit(FitnessMachineUnit unit) => unit switch
+	{
+		FitnessMachineUnit.None => string.Empty,
+		FitnessMachineUnit.KilometersPerHour => " km/h",
+		FitnessMachineUnit.Percent => " %",
+		FitnessMachineUnit.Watt => " W",
+		FitnessMachineUnit.BeatsPerMinute => " bpm",
+		FitnessMachineUnit.Calories => " kcal",
+		FitnessMachineUnit.Steps => " steps",
+		FitnessMachineUnit.Stride => " strides",
+		FitnessMachineUnit.Millimeters => " mm",
+		FitnessMachineUnit.Meters => " m",
+		FitnessMachineUnit.Seconds => " s",
+		FitnessMachineUnit.PerMinute => " rpm",
+		FitnessMachineUnit.MetersPerSecond => " m/s",
+		FitnessMachineUnit.KilogramPerMeter => " kg/m",
+		_ => string.Empty,
+	};
+
+	private static string FormatRawData(EStateOpCode opCode, byte[] rawData)
+		=> string.Join(" ", rawData.Prepend((byte)opCode).Select(b => b.ToString("X2")));
 
 	private void HandleTrainingState(ITrainingState state)
 	{
@@ -163,6 +224,7 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 		this.currentState = null;
 		this.previousStates.Clear();
 		this.TrainingStateHistory.Clear();
+		this.MachineStateLog.Clear();
 		this.currentProviderSubscriptions.Clear();
 	}
 
@@ -177,4 +239,12 @@ public sealed class TrainingStateTileItem(string stateName, double opacity)
 {
 	public string StateName { get; } = stateName;
 	public double Opacity { get; } = opacity;
+}
+
+public sealed class MachineStateLogItem(string opCodeName, string parameters, string rawData)
+{
+	public string OpCodeName { get; } = opCodeName;
+	public string Parameters { get; } = parameters;
+	public string RawData { get; } = rawData;
+	public bool HasParameters => this.Parameters.Length > 0;
 }

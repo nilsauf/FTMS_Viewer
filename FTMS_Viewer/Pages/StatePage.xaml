@@ -41,8 +41,26 @@
 				</VerticalStackLayout>
 			</Border>
 		</VerticalStackLayout>
-		<ScrollView Grid.Row="1" Margin="10">
-			<VerticalStackLayout />
-		</ScrollView>
+		<CollectionView Grid.Row="1" Margin="10" x:Name="MachineStateLogCollectionView"
+						ItemsSource="{Binding MachineStateLog}"
+						SelectionMode="None">
+			<CollectionView.ItemTemplate>
+				<DataTemplate x:DataType="l:MachineStateLogItem">
+					<Border StrokeThickness="2" StrokeShape="RoundRectangle 10,10,10,10" Padding="8" Margin="0,2">
+						<VerticalStackLayout Spacing="2">
+							<Label Text="{Binding OpCodeName}"
+								   FontSize="16"
+								   FontAttributes="Bold" />
+							<Label Text="{Binding Parameters}"
+								   FontSize="13"
+								   IsVisible="{Binding HasParameters}" />
+							<Label Text="{Binding RawData}"
+								   FontSize="11"
+								   Opacity="0.6" />
+						</VerticalStackLayout>
+					</Border>
+				</DataTemplate>
+			</CollectionView.ItemTemplate>
+		</CollectionView>
 	</Grid>
 </ContentPage>
