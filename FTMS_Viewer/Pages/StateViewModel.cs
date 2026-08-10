@@ -9,6 +9,7 @@ using System.Reactive.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 using FTMS.NET;
+using FTMS.NET.Exceptions;
 using FTMS.NET.State;
 
 using Microsoft.Extensions.Logging;
@@ -59,6 +60,12 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 	[ObservableProperty]
 	[NotifyPropertyChangedFor(nameof(IsDetailsVisible))]
 	public partial string CurrentDetails { get; private set; } = string.Empty;
+
+	[ObservableProperty]
+	public partial bool IsMachineStateNotSupported { get; private set; }
+
+	[ObservableProperty]
+	public partial bool IsTrainingStateNotSupported { get; private set; }
 
 	public ObservableCollection<TrainingStateTileItem> TrainingStateHistory { get; } = [];
 
@@ -269,14 +276,34 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 		=> state.ToString().AddSpacesBetweenWords();
 
 	private void HandleMachineStateError(Exception ex)
-		=> this.logger.LogError(ex, "Error during observing machine state! Stopping machine-state stream...");
+	{
+		if (ex is NeededCharacteristicNotAvailableException)
+		{
+			this.IsMachineStateNotSupported = true;
+			this.logger.LogError(ex, "Machine state is not supported by the connected machine; showing 'Not Supported' banner.");
+			return;
+		}
+
+		this.logger.LogError(ex, "Error during observing machine state! Stopping machine-state stream...");
+	}
 
 	private void HandleTrainingStateError(Exception ex)
-		=> this.logger.LogError(ex, "Error during observing training state! Stopping training-state stream...");
+	{
+		if (ex is NeededCharacteristicNotAvailableException)
+		{
+			this.IsTrainingStateNotSupported = true;
+			this.logger.LogError(ex, "Training state is not supported by the connected machine; showing 'Not Supported' banner.");
+			return;
+		}
+
+		this.logger.LogError(ex, "Error during observing training state! Stopping training-state stream...");
+	}
 
 	private void ResetState()
 	{
 		this.IsConnected = false;
+		this.IsMachineStateNotSupported = false;
+		this.IsTrainingStateNotSupported = false;
 		this.Status = NotConnected;
 		this.CurrentDetails = string.Empty;
 		this.currentState = null;

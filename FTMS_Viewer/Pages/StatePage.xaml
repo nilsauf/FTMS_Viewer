@@ -32,6 +32,40 @@
 					</VerticalStackLayout>
 				</VerticalStackLayout>
 			</Border>
+			<Border IsVisible="{Binding IsMachineStateNotSupported}"
+					Stroke="Red"
+					StrokeThickness="2"
+					StrokeShape="RoundRectangle 10,10,10,10"
+					Padding="10">
+				<VerticalStackLayout Spacing="2">
+					<Label Text="Machine State Not Supported"
+						   TextColor="Red"
+						   FontSize="16"
+						   FontAttributes="Bold"
+						   HorizontalTextAlignment="Center" />
+					<Label Text="This machine does not offer the Machine State characteristic."
+						   FontSize="12"
+						   Opacity="0.7"
+						   HorizontalTextAlignment="Center" />
+				</VerticalStackLayout>
+			</Border>
+			<Border IsVisible="{Binding IsTrainingStateNotSupported}"
+					Stroke="Red"
+					StrokeThickness="2"
+					StrokeShape="RoundRectangle 10,10,10,10"
+					Padding="10">
+				<VerticalStackLayout Spacing="2">
+					<Label Text="Training State Not Supported"
+						   TextColor="Red"
+						   FontSize="16"
+						   FontAttributes="Bold"
+						   HorizontalTextAlignment="Center" />
+					<Label Text="This machine does not offer the Training State characteristic."
+						   FontSize="12"
+						   Opacity="0.7"
+						   HorizontalTextAlignment="Center" />
+				</VerticalStackLayout>
+			</Border>
 			<Border StrokeThickness="2" StrokeShape="RoundRectangle 10,10,10,10" Padding="10">
 				<VerticalStackLayout Spacing="2">
 					<Label Text="Current Targets"
