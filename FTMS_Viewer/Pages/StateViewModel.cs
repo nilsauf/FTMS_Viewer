@@ -93,7 +93,7 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 			.ObserveOn(SynchronizationContext.Current!)
 			.Subscribe(
 				this.HandleStateProvider,
-				ex => this.logger.LogError(ex, "Error during observing current service state! Stopping..."));
+				ex => this.LogErrorObservingCurrentServiceState(ex));
 	}
 
 	private static IObservable<IFitnessMachineStateProvider?> CreateStateProviderObservable(
@@ -146,7 +146,7 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 
 	private void HandleMachineState(IFitnessMachineState state)
 	{
-		this.logger.LogDebug("Received machine state notification: {OpCode}", state.OpCode);
+		this.LogReceivedMachineState(state.OpCode);
 		this.UpdateCurrentTarget(state);
 		this.AppendMachineStateLogEntry(state);
 	}
@@ -159,7 +159,7 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 		var parameters = ReadParametersSafe(state);
 		if (parameters is null)
 		{
-			this.logger.LogWarning("Failed to decode machine-state parameters for opcode {OpCode}", state.OpCode);
+			this.LogFailedToDecodeMachineStateParameters(state.OpCode);
 			return;
 		}
 
@@ -173,7 +173,7 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 		string parameterText = string.Empty;
 		if (parameters is null)
 		{
-			this.logger.LogWarning("Received machine-state notification with unknown opcode {OpCode}", state.OpCode);
+			this.LogReceivedUnknownMachineState(state.OpCode);
 			opCodeName = $"Unknown Opcode (0x{(byte)state.OpCode:X2})";
 		}
 		else
@@ -234,7 +234,7 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 
 	private void HandleTrainingState(ITrainingState state)
 	{
-		this.logger.LogDebug("Received training state notification: {State}", state.State);
+		this.LogReceivedTrainingState(state.State);
 		this.UpdateCurrentState(state.State, state.Details);
 	}
 
@@ -280,11 +280,11 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 		if (ex is NeededCharacteristicNotAvailableException)
 		{
 			this.IsMachineStateNotSupported = true;
-			this.logger.LogError(ex, "Machine state is not supported by the connected machine; showing 'Not Supported' banner.");
+			this.LogMachineStateNotSupported(ex);
 			return;
 		}
 
-		this.logger.LogError(ex, "Error during observing machine state! Stopping machine-state stream...");
+		this.LogErrorObservingMachineState(ex);
 	}
 
 	private void HandleTrainingStateError(Exception ex)
@@ -292,11 +292,11 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 		if (ex is NeededCharacteristicNotAvailableException)
 		{
 			this.IsTrainingStateNotSupported = true;
-			this.logger.LogError(ex, "Training state is not supported by the connected machine; showing 'Not Supported' banner.");
+			this.LogTrainingStateNotSupported(ex);
 			return;
 		}
 
-		this.logger.LogError(ex, "Error during observing training state! Stopping training-state stream...");
+		this.LogErrorObservingTrainingState(ex);
 	}
 
 	private void ResetState()
@@ -320,6 +320,33 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 		this.currentProviderSubscriptions.Dispose();
 		this.cleanUp.Dispose();
 	}
+
+	[LoggerMessage(LogLevel.Error, "Error during observing current service state! Stopping...")]
+	private partial void LogErrorObservingCurrentServiceState(Exception ex);
+
+	[LoggerMessage(LogLevel.Debug, "Received machine state notification: {OpCode}")]
+	private partial void LogReceivedMachineState(EStateOpCode opCode);
+
+	[LoggerMessage(LogLevel.Warning, "Failed to decode machine-state parameters for opcode {OpCode}")]
+	private partial void LogFailedToDecodeMachineStateParameters(EStateOpCode opCode);
+
+	[LoggerMessage(LogLevel.Warning, "Received machine-state notification with unknown opcode {OpCode}")]
+	private partial void LogReceivedUnknownMachineState(EStateOpCode opCode);
+
+	[LoggerMessage(LogLevel.Debug, "Received training state notification: {State}")]
+	private partial void LogReceivedTrainingState(ETrainingState state);
+
+	[LoggerMessage(LogLevel.Error, "Machine state is not supported by the connected machine; showing 'Not Supported' banner.")]
+	private partial void LogMachineStateNotSupported(Exception ex);
+
+	[LoggerMessage(LogLevel.Error, "Error during observing machine state! Stopping machine-state stream...")]
+	private partial void LogErrorObservingMachineState(Exception ex);
+
+	[LoggerMessage(LogLevel.Error, "Training state is not supported by the connected machine; showing 'Not Supported' banner.")]
+	private partial void LogTrainingStateNotSupported(Exception ex);
+
+	[LoggerMessage(LogLevel.Error, "Error during observing training state! Stopping training-state stream...")]
+	private partial void LogErrorObservingTrainingState(Exception ex);
 }
 
 public sealed class TrainingStateTileItem(string stateName, double opacity)
@@ -344,7 +371,7 @@ public sealed partial class CurrentTargetItem(string name) : ObservableObject
 
 	[ObservableProperty]
 	[NotifyPropertyChangedFor(nameof(DisplayValue))]
-	private string? parameters;
+	public partial string? Parameters { get; private set;}
 
 	public string DisplayValue => this.Parameters ?? UnsetText;
 
