@@ -33,11 +33,29 @@
 				</VerticalStackLayout>
 			</Border>
 			<Border StrokeThickness="2" StrokeShape="RoundRectangle 10,10,10,10" Padding="10">
-				<VerticalStackLayout>
+				<VerticalStackLayout Spacing="2">
 					<Label Text="Current Targets"
 						   FontSize="18"
 						   FontAttributes="Bold"
 						   HorizontalTextAlignment="Center" />
+					<VerticalStackLayout Spacing="1"
+										 BindableLayout.ItemsSource="{Binding CurrentTargets}">
+						<BindableLayout.ItemTemplate>
+							<DataTemplate x:DataType="l:CurrentTargetItem">
+								<Grid ColumnDefinitions="*,Auto">
+									<Label Grid.Column="0"
+										   Text="{Binding Name}"
+										   FontSize="13"
+										   VerticalOptions="Center" />
+									<Label Grid.Column="1"
+										   Text="{Binding DisplayValue}"
+										   FontSize="13"
+										   HorizontalTextAlignment="End"
+										   VerticalOptions="Center" />
+								</Grid>
+							</DataTemplate>
+						</BindableLayout.ItemTemplate>
+					</VerticalStackLayout>
 				</VerticalStackLayout>
 			</Border>
 		</VerticalStackLayout>

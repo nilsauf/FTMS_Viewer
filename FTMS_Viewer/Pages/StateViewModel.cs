@@ -22,10 +22,31 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 	private const double HistoryOpacityStep = 0.25;
 	private const int MachineStateLogCapacity = 100;
 
+	private static readonly (EStateOpCode OpCode, string Name)[] CurrentTargetRoster =
+	[
+		(EStateOpCode.TargetSpeedChanged, "Target Speed"),
+		(EStateOpCode.TargetInclineChanged, "Target Incline"),
+		(EStateOpCode.TargetResistanceLevelChanged, "Target Resistance Level"),
+		(EStateOpCode.TargetPowerChanged, "Target Power"),
+		(EStateOpCode.TargetHeartRateChanged, "Target Heart Rate"),
+		(EStateOpCode.TargetedExpendedEnergyChanged, "Targeted Expended Energy"),
+		(EStateOpCode.TargetedNumberOfStepsChanged, "Targeted Number of Steps"),
+		(EStateOpCode.TargetedNumberOfStridesChanged, "Targeted Number of Strides"),
+		(EStateOpCode.TargetedDistanceChanged, "Targeted Distance"),
+		(EStateOpCode.TargetedTrainingTimeChanged, "Targeted Training Time"),
+		(EStateOpCode.TargetedTimeInTwoHeartRateZonesChanged, "Targeted Time in Two Heart Rate Zones"),
+		(EStateOpCode.TargetedTimeInThreeHeartRateZonesChanged, "Targeted Time in Three Heart Rate Zones"),
+		(EStateOpCode.TargetedTimeInFiveHeartRateZonesChanged, "Targeted Time in Five Heart Rate Zones"),
+		(EStateOpCode.IndoorBikeSimulationParametersChanged, "Indoor Bike Simulation Parameters"),
+		(EStateOpCode.WheelCircumferenceChanged, "Wheel Circumference"),
+		(EStateOpCode.TargetedCadenceChanged, "Targeted Cadence"),
+	];
+
 	private readonly ILogger<StateViewModel> logger;
 	private readonly IDisposable cleanUp;
 	private readonly CompositeDisposable currentProviderSubscriptions = new();
 	private readonly List<ETrainingState> previousStates = [];
+	private readonly Dictionary<EStateOpCode, CurrentTargetItem> currentTargetIndex = [];
 
 	private ETrainingState? currentState;
 
@@ -43,10 +64,19 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 
 	public ObservableCollection<MachineStateLogItem> MachineStateLog { get; } = [];
 
+	public ObservableCollection<CurrentTargetItem> CurrentTargets { get; } = [];
+
 	public bool IsDetailsVisible => !string.IsNullOrEmpty(this.CurrentDetails);
 
 	public StateViewModel(IConnectionManager connectionManager, ILogger<StateViewModel> logger)
 	{
+		foreach (var (opCode, name) in CurrentTargetRoster)
+		{
+			var item = new CurrentTargetItem(name);
+			this.CurrentTargets.Add(item);
+			this.currentTargetIndex.Add(opCode, item);
+		}
+
 		this.logger = logger;
 		this.cleanUp = connectionManager.ObserveCurrentServiceConnection(
 				s => s
@@ -110,27 +140,55 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 	private void HandleMachineState(IFitnessMachineState state)
 	{
 		this.logger.LogDebug("Received machine state notification: {OpCode}", state.OpCode);
+		this.UpdateCurrentTarget(state);
 		this.AppendMachineStateLogEntry(state);
+	}
+
+	private void UpdateCurrentTarget(IFitnessMachineState state)
+	{
+		if (!this.currentTargetIndex.TryGetValue(state.OpCode, out var item))
+			return;
+
+		var parameters = ReadParametersSafe(state);
+		if (parameters is null)
+		{
+			this.logger.LogWarning("Failed to decode machine-state parameters for opcode {OpCode}", state.OpCode);
+			return;
+		}
+
+		item.SetParameters(string.Join("\n", parameters.Select(FormatParameter)));
 	}
 
 	private void AppendMachineStateLogEntry(IFitnessMachineState state)
 	{
 		string opCodeName = state.OpCode.ToString().AddSpacesBetweenWords();
-		string parameters;
-		try
-		{
-			parameters = string.Join(", ", state.ReadParameters().Select(FormatParameter));
-		}
-		catch (KeyNotFoundException)
+		var parameters = ReadParametersSafe(state);
+		string parameterText = string.Empty;
+		if (parameters is null)
 		{
 			this.logger.LogWarning("Received machine-state notification with unknown opcode {OpCode}", state.OpCode);
 			opCodeName = $"Unknown Opcode (0x{(byte)state.OpCode:X2})";
-			parameters = string.Empty;
+		}
+		else
+		{
+			parameterText = string.Join(", ", parameters.Select(FormatParameter));
 		}
 
-		this.MachineStateLog.Add(new MachineStateLogItem(opCodeName, parameters, FormatRawData(state.OpCode, state.RawData)));
+		this.MachineStateLog.Add(new MachineStateLogItem(opCodeName, parameterText, FormatRawData(state.OpCode, state.RawData)));
 		if (this.MachineStateLog.Count > MachineStateLogCapacity)
 			this.MachineStateLog.RemoveAt(0);
+	}
+
+	private static IEnumerable<object>? ReadParametersSafe(IFitnessMachineState state)
+	{
+		try
+		{
+			return state.ReadParameters();
+		}
+		catch (KeyNotFoundException)
+		{
+			return null;
+		}
 	}
 
 	private static string FormatParameter(object parameter)
@@ -225,6 +283,8 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 		this.previousStates.Clear();
 		this.TrainingStateHistory.Clear();
 		this.MachineStateLog.Clear();
+		foreach (var item in this.CurrentTargets)
+			item.Reset();
 		this.currentProviderSubscriptions.Clear();
 	}
 
@@ -247,4 +307,21 @@ public sealed class MachineStateLogItem(string opCodeName, string parameters, st
 	public string Parameters { get; } = parameters;
 	public string RawData { get; } = rawData;
 	public bool HasParameters => this.Parameters.Length > 0;
+}
+
+public sealed partial class CurrentTargetItem(string name) : ObservableObject
+{
+	private const string UnsetText = "unset";
+
+	public string Name { get; } = name;
+
+	[ObservableProperty]
+	[NotifyPropertyChangedFor(nameof(DisplayValue))]
+	private string? parameters;
+
+	public string DisplayValue => this.Parameters ?? UnsetText;
+
+	public void SetParameters(string value) => this.Parameters = value;
+
+	public void Reset() => this.Parameters = null;
 }
