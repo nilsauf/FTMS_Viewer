@@ -20,6 +20,9 @@
 			ContentTemplate="{DataTemplate pages:DataPage}"
 			Title="Data" />
 		<ShellContent
+			ContentTemplate="{DataTemplate pages:StatePage}"
+			Title="State" />
+		<ShellContent
 			ContentTemplate="{DataTemplate pages:ControlPage}"
 			Title="Control" />
 	</TabBar>

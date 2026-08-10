@@ -55,6 +55,7 @@ public static class MauiProgram
 			.AddSingleton<ConnectionViewModel>()
 			.AddSingleton<FeaturesViewModel>()
 			.AddSingleton<DataViewModel>()
+			.AddSingleton<StateViewModel>()
 			.AddSingleton<ControlViewModel>();
 	}
 

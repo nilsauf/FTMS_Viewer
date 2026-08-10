@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:l="clr-namespace:FTMS_Viewer.Pages"
+             x:Class="FTMS_Viewer.Pages.StatePage"
+             x:DataType="l:StateViewModel"
+             Title="State">
+	<Grid RowDefinitions="Auto,*">
+		<VerticalStackLayout Grid.Row="0" Spacing="10" Margin="10">
+			<Border StrokeThickness="2" StrokeShape="RoundRectangle 10,10,10,10" Padding="10">
+				<Label Text="{Binding Status}"
+					   FontSize="32"
+					   FontAttributes="Bold"
+					   HorizontalTextAlignment="Center"
+					   VerticalTextAlignment="Center" />
+			</Border>
+			<Border StrokeThickness="2" StrokeShape="RoundRectangle 10,10,10,10" Padding="10">
+				<VerticalStackLayout>
+					<Label Text="Current Targets"
+						   FontSize="18"
+						   FontAttributes="Bold"
+						   HorizontalTextAlignment="Center" />
+				</VerticalStackLayout>
+			</Border>
+		</VerticalStackLayout>
+		<ScrollView Grid.Row="1" Margin="10">
+			<VerticalStackLayout />
+		</ScrollView>
+	</Grid>
+</ContentPage>
