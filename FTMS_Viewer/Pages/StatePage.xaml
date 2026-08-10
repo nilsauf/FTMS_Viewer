@@ -8,11 +8,29 @@
 	<Grid RowDefinitions="Auto,*">
 		<VerticalStackLayout Grid.Row="0" Spacing="10" Margin="10">
 			<Border StrokeThickness="2" StrokeShape="RoundRectangle 10,10,10,10" Padding="10">
-				<Label Text="{Binding Status}"
-					   FontSize="32"
-					   FontAttributes="Bold"
-					   HorizontalTextAlignment="Center"
-					   VerticalTextAlignment="Center" />
+				<VerticalStackLayout Spacing="4">
+					<Label Text="{Binding Status}"
+						   FontSize="32"
+						   FontAttributes="Bold"
+						   HorizontalTextAlignment="Center"
+						   VerticalTextAlignment="Center" />
+					<Label Text="{Binding CurrentDetails}"
+						   FontSize="16"
+						   HorizontalTextAlignment="Center"
+						   IsVisible="{Binding IsDetailsVisible}" />
+					<VerticalStackLayout Spacing="2"
+										 BindableLayout.ItemsSource="{Binding TrainingStateHistory}">
+						<BindableLayout.ItemTemplate>
+							<DataTemplate x:DataType="l:TrainingStateTileItem">
+								<Label Text="{Binding StateName}"
+									   Opacity="{Binding Opacity}"
+									   FontSize="18"
+									   FontAttributes="Bold"
+									   HorizontalTextAlignment="Center" />
+							</DataTemplate>
+						</BindableLayout.ItemTemplate>
+					</VerticalStackLayout>
+				</VerticalStackLayout>
 			</Border>
 			<Border StrokeThickness="2" StrokeShape="RoundRectangle 10,10,10,10" Padding="10">
 				<VerticalStackLayout>

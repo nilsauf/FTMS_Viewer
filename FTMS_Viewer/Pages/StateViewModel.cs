@@ -1,5 +1,6 @@
 namespace FTMS_Viewer.Pages;
 
+using System.Collections.ObjectModel;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
@@ -16,16 +17,29 @@ using Plugin.BLE.FTMS;
 public sealed partial class StateViewModel : ObservableObject, IDisposable
 {
 	private const string NotConnected = "Not Connected";
+	private const int HistoryCapacity = 3;
+	private const double HistoryOpacityStep = 0.25;
 
 	private readonly ILogger<StateViewModel> logger;
 	private readonly IDisposable cleanUp;
 	private readonly CompositeDisposable currentProviderSubscriptions = new();
+	private readonly List<ETrainingState> previousStates = [];
+
+	private ETrainingState? currentState;
 
 	[ObservableProperty]
 	public partial string Status { get; private set; } = NotConnected;
 
 	[ObservableProperty]
 	public partial bool IsConnected { get; private set; }
+
+	[ObservableProperty]
+	[NotifyPropertyChangedFor(nameof(IsDetailsVisible))]
+	public partial string CurrentDetails { get; private set; } = string.Empty;
+
+	public ObservableCollection<TrainingStateTileItem> TrainingStateHistory { get; } = [];
+
+	public bool IsDetailsVisible => !string.IsNullOrEmpty(this.CurrentDetails);
 
 	public StateViewModel(IConnectionManager connectionManager, ILogger<StateViewModel> logger)
 	{
@@ -93,7 +107,47 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 		=> this.logger.LogDebug("Received machine state notification: {OpCode}", state.OpCode);
 
 	private void HandleTrainingState(ITrainingState state)
-		=> this.logger.LogDebug("Received training state notification: {State}", state.State);
+	{
+		this.logger.LogDebug("Received training state notification: {State}", state.State);
+		this.UpdateCurrentState(state.State, state.Details);
+	}
+
+	private void UpdateCurrentState(ETrainingState state, string? details)
+	{
+		if (this.currentState == state)
+		{
+			this.CurrentDetails = details ?? string.Empty;
+			return;
+		}
+
+		if (this.currentState is { } previous)
+			this.AddToHistory(previous);
+
+		this.currentState = state;
+		this.Status = FormatStateName(state);
+		this.CurrentDetails = details ?? string.Empty;
+		this.RebuildHistory();
+	}
+
+	private void AddToHistory(ETrainingState state)
+	{
+		this.previousStates.Add(state);
+		if (this.previousStates.Count > HistoryCapacity)
+			this.previousStates.RemoveAt(0);
+	}
+
+	private void RebuildHistory()
+	{
+		this.TrainingStateHistory.Clear();
+		for (int i = this.previousStates.Count - 1, opacityIndex = 0; i >= 0; i--, opacityIndex++)
+		{
+			var opacity = 1.0 - (opacityIndex + 1) * HistoryOpacityStep;
+			this.TrainingStateHistory.Add(new TrainingStateTileItem(FormatStateName(this.previousStates[i]), opacity));
+		}
+	}
+
+	private static string FormatStateName(ETrainingState state)
+		=> state.ToString().AddSpacesBetweenWords();
 
 	private void HandleMachineStateError(Exception ex)
 		=> this.logger.LogError(ex, "Error during observing machine state! Stopping machine-state stream...");
@@ -105,6 +159,10 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 	{
 		this.IsConnected = false;
 		this.Status = NotConnected;
+		this.CurrentDetails = string.Empty;
+		this.currentState = null;
+		this.previousStates.Clear();
+		this.TrainingStateHistory.Clear();
 		this.currentProviderSubscriptions.Clear();
 	}
 
@@ -113,4 +171,10 @@ public sealed partial class StateViewModel : ObservableObject, IDisposable
 		this.currentProviderSubscriptions.Dispose();
 		this.cleanUp.Dispose();
 	}
+}
+
+public sealed class TrainingStateTileItem(string stateName, double opacity)
+{
+	public string StateName { get; } = stateName;
+	public double Opacity { get; } = opacity;
 }
