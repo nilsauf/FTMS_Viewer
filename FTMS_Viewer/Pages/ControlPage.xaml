@@ -103,10 +103,92 @@
 			</Border>
 		</DataTemplate>
 
+		<DataTemplate x:Key="SimulationTargetTemplate"
+					  x:DataType="l:SimulationTargetItem">
+			<Border Stroke="Gray"
+					StrokeThickness="1"
+					StrokeShape="RoundRectangle 10,10,10,10"
+					Padding="12">
+				<VerticalStackLayout Spacing="8">
+					<HorizontalStackLayout Spacing="8">
+						<Label Text="{Binding Name}"
+							   FontSize="16"
+							   FontAttributes="Bold"
+							   VerticalOptions="Center" />
+						<Label Text="advertised as not supported"
+							   FontSize="12"
+							   TextColor="DarkOrange"
+							   VerticalOptions="Center"
+							   IsVisible="{Binding IsNotSupported}" />
+					</HorizontalStackLayout>
+					<VerticalStackLayout Spacing="4"
+										 BindableLayout.ItemsSource="{Binding Entries}">
+						<BindableLayout.ItemTemplate>
+							<DataTemplate x:DataType="l:SimulationTargetEntry">
+								<HorizontalStackLayout Spacing="8">
+									<Label Text="{Binding Label}"
+										   FontSize="14"
+										   WidthRequest="150"
+										   VerticalOptions="Center" />
+									<Label Text="{Binding Unit}"
+										   FontSize="14"
+										   Opacity="0.6"
+										   WidthRequest="45"
+										   VerticalOptions="Center" />
+									<Entry Text="{Binding Value}"
+										   FontSize="16"
+										   WidthRequest="140"
+										   Placeholder="{Binding Label}" />
+								</HorizontalStackLayout>
+							</DataTemplate>
+						</BindableLayout.ItemTemplate>
+					</VerticalStackLayout>
+					<Button Text="Send"
+							Command="{Binding Command}"
+							FontSize="16"
+							HeightRequest="44" />
+				</VerticalStackLayout>
+			</Border>
+		</DataTemplate>
+
+		<DataTemplate x:Key="SpinDownTemplate"
+					  x:DataType="l:SpinDownItem">
+			<Border Stroke="Gray"
+					StrokeThickness="1"
+					StrokeShape="RoundRectangle 10,10,10,10"
+					Padding="12">
+				<VerticalStackLayout Spacing="8">
+					<HorizontalStackLayout Spacing="8">
+						<Label Text="{Binding Name}"
+							   FontSize="16"
+							   FontAttributes="Bold"
+							   VerticalOptions="Center" />
+						<Label Text="advertised as not supported"
+							   FontSize="12"
+							   TextColor="DarkOrange"
+							   VerticalOptions="Center"
+							   IsVisible="{Binding IsNotSupported}" />
+					</HorizontalStackLayout>
+					<HorizontalStackLayout Spacing="8">
+						<Button Text="Start"
+								Command="{Binding StartCommand}"
+								FontSize="16"
+								HeightRequest="44" />
+						<Button Text="Ignore"
+								Command="{Binding IgnoreCommand}"
+								FontSize="16"
+								HeightRequest="44" />
+					</HorizontalStackLayout>
+				</VerticalStackLayout>
+			</Border>
+		</DataTemplate>
+
 		<l:ControlItemTemplateSelector x:Key="ControlItemTemplateSelector"
 									   OperationTemplate="{StaticResource ControlOperationTemplate}"
 									   ValueTemplate="{StaticResource TargetValueTemplate}"
-									   MultiValueTemplate="{StaticResource MultiValueTargetTemplate}" />
+									   MultiValueTemplate="{StaticResource MultiValueTargetTemplate}"
+									   SimulationTemplate="{StaticResource SimulationTargetTemplate}"
+									   SpinDownTemplate="{StaticResource SpinDownTemplate}" />
 	</ContentPage.Resources>
 
 	<Grid RowDefinitions="Auto,Auto,*">

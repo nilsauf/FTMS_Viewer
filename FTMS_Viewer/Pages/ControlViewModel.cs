@@ -46,6 +46,10 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	private readonly List<IAsyncRelayCommand> targetValueCommands = [];
 	private readonly List<MultiValueTargetItem> multiValueItems = [];
 	private readonly List<IAsyncRelayCommand> multiValueCommands = [];
+	private readonly List<SimulationTargetItem> simulationItems = [];
+	private readonly List<IAsyncRelayCommand> simulationCommands = [];
+	private readonly List<SpinDownItem> spinDownItems = [];
+	private readonly List<IAsyncRelayCommand> spinDownCommands = [];
 	private IFitnessMachineFeatures? features;
 
 	[ObservableProperty]
@@ -62,6 +66,10 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 		foreach (var command in this.targetValueCommands)
 			command.NotifyCanExecuteChanged();
 		foreach (var command in this.multiValueCommands)
+			command.NotifyCanExecuteChanged();
+		foreach (var command in this.simulationCommands)
+			command.NotifyCanExecuteChanged();
+		foreach (var command in this.spinDownCommands)
 			command.NotifyCanExecuteChanged();
 	}
 
@@ -205,6 +213,10 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	private static string FormatValue(double value)
 		=> value.ToString("0.###", CultureInfo.InvariantCulture);
 
+	/// <summary>Formats a raw spin-down target speed (km/h × 100) in km/h.</summary>
+	private static string FormatTargetSpeed(ushort rawValue)
+		=> (rawValue / 100.0).ToString("0.#", CultureInfo.InvariantCulture);
+
 	private void HandleMachineStateError(Exception ex)
 	{
 		if (ex is NeededCharacteristicNotAvailableException)
@@ -259,6 +271,19 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 		workoutTargetsGroup.Items.Add(this.CreateMultiValueItem("Time in 5 HR Zones", "s", EControlOpCode.SetTargetedTimeInFiveHeartRateZones,
 			f => f.TargetedTimeInFiveHeartRateZonesConfigurationSupported, "Very Light", "Light", "Moderate", "Hard", "Maximum"));
 		this.ControlGroups.Add(workoutTargetsGroup);
+
+		var bikeGroup = new ControlGroupViewModel("Bike");
+		bikeGroup.Items.Add(this.CreateSimulationItem(
+			"Indoor Bike Simulation",
+			f => f.IndoorBikeSimulationParametersSupported,
+			new SimulationTargetEntry("Wind Speed", "m/s", 1000, TargetValueShape.Int16),
+			new SimulationTargetEntry("Grade", "%", 100, TargetValueShape.Int16),
+			new SimulationTargetEntry("Rolling Resistance", string.Empty, 10000, TargetValueShape.Byte),
+			new SimulationTargetEntry("Wind Resistance", "kg/m", 100, TargetValueShape.Byte)));
+		bikeGroup.Items.Add(this.CreateTargetValueItem("Wheel Circumference", "mm", EControlOpCode.SetWheelCircumference, EStateOpCode.WheelCircumferenceChanged, 10, TargetValueShape.UInt16,
+			f => f.WheelCircumferenceConfigurationSupported, f => null));
+		bikeGroup.Items.Add(this.CreateSpinDownItem("Spin-Down", f => f.SpinDownControlSupported));
+		this.ControlGroups.Add(bikeGroup);
 	}
 
 	private TargetValueItem CreateTargetValueItem(
@@ -299,11 +324,44 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 		return item;
 	}
 
+	private SimulationTargetItem CreateSimulationItem(
+		string name,
+		Func<IFitnessMachineFeatures, bool> isSupported,
+		params SimulationTargetEntry[] entries)
+	{
+		SimulationTargetItem? item = null;
+		var command = new AsyncRelayCommand(
+			() => this.SendSimulationAsync(item!),
+			this.CanSendRequest);
+		item = new SimulationTargetItem(name, isSupported, command, entries);
+		this.simulationItems.Add(item);
+		this.simulationCommands.Add(command);
+		return item;
+	}
+
+	private SpinDownItem CreateSpinDownItem(
+		string name,
+		Func<IFitnessMachineFeatures, bool> isSupported)
+	{
+		SpinDownItem? item = null;
+		var startCommand = new AsyncRelayCommand(this.SendSpinDownStartAsync, this.CanSendRequest);
+		var ignoreCommand = new AsyncRelayCommand(this.SendSpinDownIgnoreAsync, this.CanSendRequest);
+		item = new SpinDownItem(name, isSupported, startCommand, ignoreCommand);
+		this.spinDownItems.Add(item);
+		this.spinDownCommands.Add(startCommand);
+		this.spinDownCommands.Add(ignoreCommand);
+		return item;
+	}
+
 	private void ApplyFeatures()
 	{
 		foreach (var item in this.targetValueItems)
 			item.ApplyFeatures(this.features);
 		foreach (var item in this.multiValueItems)
+			item.ApplyFeatures(this.features);
+		foreach (var item in this.simulationItems)
+			item.ApplyFeatures(this.features);
+		foreach (var item in this.spinDownItems)
 			item.ApplyFeatures(this.features);
 	}
 
@@ -366,6 +424,41 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 			() => SendZoneTimeSettingAsync(this.Control!, item.OpCode, values));
 	}
 
+	private async Task SendSimulationAsync(SimulationTargetItem item)
+	{
+		var values = new List<double>(item.Entries.Count);
+		foreach (var entry in item.Entries)
+		{
+			string fieldName = $"{item.Name} ({entry.Label})";
+			double? humanValue = await this.TryParseHumanValueAsync(fieldName, entry.Value);
+			if (humanValue is not { } parsed)
+				return;
+
+			values.Add(entry.Encode(parsed));
+		}
+
+		await this.SendRequestAsync(
+			item.Name,
+			EControlOpCode.SetIndoorBikeSimulationParameters,
+			() => SendSimulationSettingAsync(this.Control!, values));
+	}
+
+	private async Task SendSpinDownStartAsync()
+	{
+		(ushort low, ushort high) targetSpeeds = default;
+		await this.SendRequestAsync(
+			"Spin-Down Start",
+			EControlOpCode.SpinDownControl,
+			async () => targetSpeeds = await this.Control!.StartSpinDownControl(),
+			successStatus: () => $"Spin-Down Start: Success — Target speed {FormatTargetSpeed(targetSpeeds.low)}-{FormatTargetSpeed(targetSpeeds.high)} km/h");
+	}
+
+	private Task SendSpinDownIgnoreAsync()
+		=> this.SendRequestAsync(
+			"Spin-Down Ignore",
+			EControlOpCode.SpinDownControl,
+			() => this.Control!.IgnoreSpinDownControl());
+
 	/// <summary>
 	/// Parses an entered human-unit value, or shows an invalid-value toast and returns null.
 	/// </summary>
@@ -385,7 +478,8 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 		string name,
 		EControlOpCode opCode,
 		Func<Task> send,
-		Action? onSuccess = null)
+		Action? onSuccess = null,
+		Func<string>? successStatus = null)
 	{
 		this.LogSendingControlRequest(opCode);
 
@@ -395,7 +489,7 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 
 			onSuccess?.Invoke();
 
-			this.Status = $"{name}: Success";
+			this.Status = successStatus?.Invoke() ?? $"{name}: Success";
 			if (opCode == EControlOpCode.RequestControl)
 				this.Permission = ControlPermission.Granted;
 
@@ -462,6 +556,9 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 			case EControlOpCode.SetTargetedTrainingTime:
 				await control.SetTargetedTrainingTime((ushort)rawValue);
 				break;
+			case EControlOpCode.SetWheelCircumference:
+				await control.SetWheelCircumference((ushort)rawValue);
+				break;
 			default:
 				throw new InvalidOperationException($"Unhandled target-setting op code {opCode}");
 		}
@@ -487,6 +584,15 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 				throw new InvalidOperationException($"Unhandled zone-time op code {opCode}");
 		}
 	}
+
+	private static Task SendSimulationSettingAsync(
+		IFitnessMachineControl control,
+		IReadOnlyList<double> values)
+		=> control.SetIndoorBikeSimulationParameters(
+			(short)values[0],
+			(short)values[1],
+			(byte)values[2],
+			(byte)values[3]);
 
 	private static double ClampAndSnap(ISupportedRange range, double value)
 	{
@@ -690,19 +796,7 @@ public sealed partial class TargetValueItem : ControlItemViewModel
 
 	/// <summary>Encodes a human-unit value into the raw format, bounded by the raw type.</summary>
 	public double Encode(double humanValue)
-		=> Math.Clamp(
-			Math.Round(humanValue * this.Factor, MidpointRounding.AwayFromZero),
-			this.GetRawBounds().Min,
-			this.GetRawBounds().Max);
-
-	private (double Min, double Max) GetRawBounds() => this.Shape switch
-	{
-		TargetValueShape.Byte => (byte.MinValue, byte.MaxValue),
-		TargetValueShape.UInt16 => (ushort.MinValue, ushort.MaxValue),
-		TargetValueShape.Int16 => (short.MinValue, short.MaxValue),
-		TargetValueShape.UInt24 => (UInt24.MinValue.Value, UInt24.MaxValue.Value),
-		_ => throw new ArgumentOutOfRangeException(nameof(this.Shape)),
-	};
+		=> TargetValueEncoding.Encode(humanValue, this.Factor, this.Shape);
 }
 
 /// <summary>
@@ -747,10 +841,7 @@ public sealed partial class MultiValueTargetItem : ControlItemViewModel
 
 	/// <summary>Encodes a human-unit value into the raw ushort format.</summary>
 	public double Encode(double humanValue)
-		=> Math.Clamp(
-			Math.Round(humanValue, MidpointRounding.AwayFromZero),
-			ushort.MinValue,
-			ushort.MaxValue);
+		=> TargetValueEncoding.Encode(humanValue, 1, TargetValueShape.UInt16);
 }
 
 /// <summary>One entry field of a <see cref="MultiValueTargetItem"/>.</summary>
@@ -761,6 +852,121 @@ public sealed partial class MultiValueTargetEntry(string label) : ObservableObje
 	/// <summary>The human-unit value the user entered; survives reconnects because it lives here.</summary>
 	[ObservableProperty]
 	public partial string Value { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// The indoor bike simulation card: renders the four simulation parameters (wind speed, grade,
+/// rolling-resistance coefficient, wind-resistance coefficient) as entry fields, encodes each in
+/// its own spec factor at send time, and sends them in a single control request. Tags itself when
+/// the machine does not advertise support; entered values survive reconnects.
+/// </summary>
+public sealed partial class SimulationTargetItem : ControlItemViewModel
+{
+	private readonly Func<IFitnessMachineFeatures, bool> isSupported;
+
+	public SimulationTargetItem(
+		string name,
+		Func<IFitnessMachineFeatures, bool> isSupported,
+		ICommand command,
+		params SimulationTargetEntry[] entries)
+		: base(name)
+	{
+		this.isSupported = isSupported;
+		this.Command = command;
+		foreach (var entry in entries)
+			this.Entries.Add(entry);
+	}
+
+	public override ICommand Command { get; }
+
+	public ObservableCollection<SimulationTargetEntry> Entries { get; } = [];
+
+	[ObservableProperty]
+	public partial bool IsNotSupported { get; set; }
+
+	public void ApplyFeatures(IFitnessMachineFeatures? features)
+		=> this.IsNotSupported = features is not null && !this.isSupported(features);
+}
+
+/// <summary>One entry field of a <see cref="SimulationTargetItem"/>.</summary>
+public sealed partial class SimulationTargetEntry : ObservableObject
+{
+	public SimulationTargetEntry(string label, string unit, double factor, TargetValueShape shape)
+	{
+		this.Label = label;
+		this.Unit = unit;
+		this.Factor = factor;
+		this.Shape = shape;
+	}
+
+	public string Label { get; }
+
+	public string Unit { get; }
+
+	public double Factor { get; }
+
+	public TargetValueShape Shape { get; }
+
+	/// <summary>The human-unit value the user entered; survives reconnects because it lives here.</summary>
+	[ObservableProperty]
+	public partial string Value { get; set; } = string.Empty;
+
+	/// <summary>Encodes a human-unit value into the raw format, bounded by the raw type.</summary>
+	public double Encode(double humanValue)
+		=> TargetValueEncoding.Encode(humanValue, this.Factor, this.Shape);
+}
+
+/// <summary>
+/// The spin-down calibration card: starts the calibration with the start button (the machine
+/// answers with the measured target speed bounds, shown in the status line) or abandons it with
+/// the ignore button. Tags itself when the machine does not advertise support.
+/// </summary>
+public sealed partial class SpinDownItem : ControlItemViewModel
+{
+	private readonly Func<IFitnessMachineFeatures, bool> isSupported;
+
+	public SpinDownItem(
+		string name,
+		Func<IFitnessMachineFeatures, bool> isSupported,
+		ICommand startCommand,
+		ICommand ignoreCommand)
+		: base(name)
+	{
+		this.isSupported = isSupported;
+		this.StartCommand = startCommand;
+		this.IgnoreCommand = ignoreCommand;
+	}
+
+	public ICommand StartCommand { get; }
+
+	public ICommand IgnoreCommand { get; }
+
+	[ObservableProperty]
+	public partial bool IsNotSupported { get; set; }
+
+	public void ApplyFeatures(IFitnessMachineFeatures? features)
+		=> this.IsNotSupported = features is not null && !this.isSupported(features);
+
+	public override ICommand Command => this.StartCommand;
+}
+
+/// <summary>Encodes a human-unit value into the raw format for a value shape.</summary>
+internal static class TargetValueEncoding
+{
+	public static double Encode(double humanValue, double factor, TargetValueShape shape)
+		=> Math.Clamp(
+			Math.Round(humanValue * factor, MidpointRounding.AwayFromZero),
+			GetRawBounds(shape).Min,
+			GetRawBounds(shape).Max);
+
+	private static (double Min, double Max) GetRawBounds(TargetValueShape shape) => shape switch
+	{
+		TargetValueShape.Byte => (byte.MinValue, byte.MaxValue),
+		TargetValueShape.UInt16 => (ushort.MinValue, ushort.MaxValue),
+		TargetValueShape.Int16 => (short.MinValue, short.MaxValue),
+		TargetValueShape.UInt24 => (UInt24.MinValue.Value, UInt24.MaxValue.Value),
+		_ => throw new ArgumentOutOfRangeException(nameof(shape)),
+	};
 }
 
 public sealed class ControlGroupViewModel(string title)
