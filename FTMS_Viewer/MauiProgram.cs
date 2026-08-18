@@ -56,7 +56,8 @@ public static class MauiProgram
 			.AddSingleton<FeaturesViewModel>()
 			.AddSingleton<DataViewModel>()
 			.AddSingleton<StateViewModel>()
-			.AddSingleton<ControlViewModel>();
+			.AddSingleton<ControlViewModel>()
+			.AddSingleton<IToastService, MauiToastService>();
 	}
 
 	public static IServiceCollection AddReactiveBleServices(this IServiceCollection services)
