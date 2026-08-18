@@ -56,9 +56,57 @@
 			</Border>
 		</DataTemplate>
 
+		<DataTemplate x:Key="MultiValueTargetTemplate"
+					  x:DataType="l:MultiValueTargetItem">
+			<Border Stroke="Gray"
+					StrokeThickness="1"
+					StrokeShape="RoundRectangle 10,10,10,10"
+					Padding="12">
+				<VerticalStackLayout Spacing="8">
+					<HorizontalStackLayout Spacing="8">
+						<Label Text="{Binding Name}"
+							   FontSize="16"
+							   FontAttributes="Bold"
+							   VerticalOptions="Center" />
+						<Label Text="{Binding Unit}"
+							   FontSize="14"
+							   Opacity="0.6"
+							   VerticalOptions="Center" />
+						<Label Text="advertised as not supported"
+							   FontSize="12"
+							   TextColor="DarkOrange"
+							   VerticalOptions="Center"
+							   IsVisible="{Binding IsNotSupported}" />
+					</HorizontalStackLayout>
+					<VerticalStackLayout Spacing="4"
+										 BindableLayout.ItemsSource="{Binding Entries}">
+						<BindableLayout.ItemTemplate>
+							<DataTemplate x:DataType="l:MultiValueTargetEntry">
+								<HorizontalStackLayout Spacing="8">
+									<Label Text="{Binding Label}"
+										   FontSize="14"
+										   WidthRequest="110"
+										   VerticalOptions="Center" />
+									<Entry Text="{Binding Value}"
+										   FontSize="16"
+										   WidthRequest="140"
+										   Placeholder="{Binding Label}" />
+								</HorizontalStackLayout>
+							</DataTemplate>
+						</BindableLayout.ItemTemplate>
+					</VerticalStackLayout>
+					<Button Text="Send"
+							Command="{Binding Command}"
+							FontSize="16"
+							HeightRequest="44" />
+				</VerticalStackLayout>
+			</Border>
+		</DataTemplate>
+
 		<l:ControlItemTemplateSelector x:Key="ControlItemTemplateSelector"
 									   OperationTemplate="{StaticResource ControlOperationTemplate}"
-									   ValueTemplate="{StaticResource TargetValueTemplate}" />
+									   ValueTemplate="{StaticResource TargetValueTemplate}"
+									   MultiValueTemplate="{StaticResource MultiValueTargetTemplate}" />
 	</ContentPage.Resources>
 
 	<Grid RowDefinitions="Auto,Auto,*">

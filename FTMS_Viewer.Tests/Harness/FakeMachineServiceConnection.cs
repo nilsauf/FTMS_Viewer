@@ -31,12 +31,12 @@ public sealed class FakeMachineServiceConnection : IFitnessMachineServiceConnect
 	}
 
 	/// <summary>
-	/// Advertises every target setting the Targets group sends (speed, incline, resistance level,
-	/// power, heart rate, cadence) as supported: the target-settings field is bits 0-4 set and
-	/// bit 16 (cadence) set, the measurement-features field is all zero.
+	/// Advertises every target setting the Targets and Workout Targets groups send as supported:
+	/// bits 0-12 of the target-settings field (speed through five-zone time) and bit 16 (cadence)
+	/// set, the measurement-features field all zero.
 	/// </summary>
 	public static readonly byte[] DefaultFeatureData =
-		[0x00, 0x00, 0x00, 0x00, 0x1F, 0x00, 0x01];
+		[0x00, 0x00, 0x00, 0x00, 0xFF, 0x1F, 0x01];
 
 	/// <summary>Raw speed range: 1.0-25.0 km/h in 0.1 km/h increments.</summary>
 	public static readonly byte[] DefaultSpeedRange =

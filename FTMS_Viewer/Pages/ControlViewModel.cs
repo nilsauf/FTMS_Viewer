@@ -14,6 +14,7 @@ using FTMS.NET.Control;
 using FTMS.NET.Exceptions;
 using FTMS.NET.Features;
 using FTMS.NET.State;
+using FTMS.NET.Utils;
 
 using Microsoft.Extensions.Logging;
 
@@ -43,6 +44,8 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	private readonly CompositeDisposable currentProviderSubscriptions = new();
 	private readonly List<TargetValueItem> targetValueItems = [];
 	private readonly List<IAsyncRelayCommand> targetValueCommands = [];
+	private readonly List<MultiValueTargetItem> multiValueItems = [];
+	private readonly List<IAsyncRelayCommand> multiValueCommands = [];
 	private IFitnessMachineFeatures? features;
 
 	[ObservableProperty]
@@ -57,6 +60,8 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	partial void OnControlChanged(IFitnessMachineControl? value)
 	{
 		foreach (var command in this.targetValueCommands)
+			command.NotifyCanExecuteChanged();
+		foreach (var command in this.multiValueCommands)
 			command.NotifyCanExecuteChanged();
 	}
 
@@ -235,6 +240,25 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 		targetsGroup.Items.Add(this.CreateTargetValueItem("Target Cadence", "rpm", EControlOpCode.SetTargetedCadence, EStateOpCode.TargetedCadenceChanged, 2, TargetValueShape.UInt16,
 			f => f.TargetedCadenceConfigurationSupported, f => null));
 		this.ControlGroups.Add(targetsGroup);
+
+		var workoutTargetsGroup = new ControlGroupViewModel("Workout Targets");
+		workoutTargetsGroup.Items.Add(this.CreateTargetValueItem("Targeted Expended Energy", "kcal", EControlOpCode.SetTargetedExpendedEnergy, EStateOpCode.TargetedExpendedEnergyChanged, 1, TargetValueShape.UInt16,
+			f => f.TargetedExpendedEnergyConfigurationSupported, f => null));
+		workoutTargetsGroup.Items.Add(this.CreateTargetValueItem("Targeted Steps", string.Empty, EControlOpCode.SetTargetedNumberOfSteps, EStateOpCode.TargetedNumberOfStepsChanged, 1, TargetValueShape.UInt16,
+			f => f.TargetedStepNumberConfigurationSupported, f => null));
+		workoutTargetsGroup.Items.Add(this.CreateTargetValueItem("Targeted Strides", string.Empty, EControlOpCode.SetTargetedNumberOfStrides, EStateOpCode.TargetedNumberOfStridesChanged, 1, TargetValueShape.UInt16,
+			f => f.TargetedStrideNumberConfigurationSupported, f => null));
+		workoutTargetsGroup.Items.Add(this.CreateTargetValueItem("Targeted Distance", "m", EControlOpCode.SetTargetedDistance, EStateOpCode.TargetedDistanceChanged, 1, TargetValueShape.UInt24,
+			f => f.TargetedDistanceConfigurationSupported, f => null));
+		workoutTargetsGroup.Items.Add(this.CreateTargetValueItem("Targeted Training Time", "s", EControlOpCode.SetTargetedTrainingTime, EStateOpCode.TargetedTrainingTimeChanged, 1, TargetValueShape.UInt16,
+			f => f.TargetedTrainingTimeConfigurationSupported, f => null));
+		workoutTargetsGroup.Items.Add(this.CreateMultiValueItem("Time in 2 HR Zones", "s", EControlOpCode.SetTargetedTimeInTwoHeartRateZones,
+			f => f.TargetedTimeInTwoHeartRateZonesConfigurationSupported, "Fat Burn", "Fitness"));
+		workoutTargetsGroup.Items.Add(this.CreateMultiValueItem("Time in 3 HR Zones", "s", EControlOpCode.SetTargetedTimeInThreeHeartRateZones,
+			f => f.TargetedTimeInThreeHeartRateZonesConfigurationSupported, "Light", "Moderate", "Hard"));
+		workoutTargetsGroup.Items.Add(this.CreateMultiValueItem("Time in 5 HR Zones", "s", EControlOpCode.SetTargetedTimeInFiveHeartRateZones,
+			f => f.TargetedTimeInFiveHeartRateZonesConfigurationSupported, "Very Light", "Light", "Moderate", "Hard", "Maximum"));
+		this.ControlGroups.Add(workoutTargetsGroup);
 	}
 
 	private TargetValueItem CreateTargetValueItem(
@@ -258,9 +282,28 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 		return item;
 	}
 
+	private MultiValueTargetItem CreateMultiValueItem(
+		string name,
+		string unit,
+		EControlOpCode opCode,
+		Func<IFitnessMachineFeatures, bool> isSupported,
+		params string[] entryLabels)
+	{
+		MultiValueTargetItem? item = null;
+		var command = new AsyncRelayCommand(
+			() => this.SendMultiValueAsync(item!),
+			this.CanSendRequest);
+		item = new MultiValueTargetItem(name, unit, opCode, isSupported, command, entryLabels);
+		this.multiValueItems.Add(item);
+		this.multiValueCommands.Add(command);
+		return item;
+	}
+
 	private void ApplyFeatures()
 	{
 		foreach (var item in this.targetValueItems)
+			item.ApplyFeatures(this.features);
+		foreach (var item in this.multiValueItems)
 			item.ApplyFeatures(this.features);
 	}
 
@@ -288,25 +331,54 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 
 	private async Task SendTargetValueAsync(TargetValueItem item)
 	{
-		if (!double.TryParse(item.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double humanValue))
-		{
-			this.LogInvalidTargetValue(item.Name, item.Value);
-			string message = $"{item.Name}: Invalid value";
-			this.Status = message;
-			await this.toastService.ShowAsync(message);
+		double? humanValue = await this.TryParseHumanValueAsync(item.Name, item.Value);
+		if (humanValue is not { } parsed)
 			return;
-		}
 
 		if (this.IsAllowOutOfRange is false && item.Range is { } range)
-			humanValue = ClampAndSnap(range, humanValue);
+			parsed = ClampAndSnap(range, parsed);
 
-		double rawValue = item.Encode(humanValue);
+		double rawValue = item.Encode(parsed);
 
 		await this.SendRequestAsync(
 			item.Name,
 			item.OpCode,
 			() => SendTargetSettingAsync(this.Control!, item.OpCode, rawValue),
 			() => item.IsDirty = false);
+	}
+
+	private async Task SendMultiValueAsync(MultiValueTargetItem item)
+	{
+		var values = new List<ushort>(item.Entries.Count);
+		foreach (var entry in item.Entries)
+		{
+			string fieldName = $"{item.Name} ({entry.Label})";
+			double? humanValue = await this.TryParseHumanValueAsync(fieldName, entry.Value);
+			if (humanValue is not { } parsed)
+				return;
+
+			values.Add((ushort)item.Encode(parsed));
+		}
+
+		await this.SendRequestAsync(
+			item.Name,
+			item.OpCode,
+			() => SendZoneTimeSettingAsync(this.Control!, item.OpCode, values));
+	}
+
+	/// <summary>
+	/// Parses an entered human-unit value, or shows an invalid-value toast and returns null.
+	/// </summary>
+	private async Task<double?> TryParseHumanValueAsync(string fieldName, string entry)
+	{
+		if (double.TryParse(entry, NumberStyles.Float, CultureInfo.InvariantCulture, out double humanValue))
+			return humanValue;
+
+		this.LogInvalidTargetValue(fieldName, entry);
+		string message = $"{fieldName}: Invalid value";
+		this.Status = message;
+		await this.toastService.ShowAsync(message);
+		return null;
 	}
 
 	private async Task SendRequestAsync(
@@ -375,8 +447,44 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 			case EControlOpCode.SetTargetedCadence:
 				await control.SetTargetedCadence((ushort)rawValue);
 				break;
+			case EControlOpCode.SetTargetedExpendedEnergy:
+				await control.SetTargetedExpendedEnergy((ushort)rawValue);
+				break;
+			case EControlOpCode.SetTargetedNumberOfSteps:
+				await control.SetTargetedNumberOfSteps((ushort)rawValue);
+				break;
+			case EControlOpCode.SetTargetedNumberOfStrides:
+				await control.SetTargetedNumberOfStrides((ushort)rawValue);
+				break;
+			case EControlOpCode.SetTargetedDistance:
+				await control.SetTargetedDistance(new UInt24((uint)rawValue));
+				break;
+			case EControlOpCode.SetTargetedTrainingTime:
+				await control.SetTargetedTrainingTime((ushort)rawValue);
+				break;
 			default:
 				throw new InvalidOperationException($"Unhandled target-setting op code {opCode}");
+		}
+	}
+
+	private static async Task SendZoneTimeSettingAsync(
+		IFitnessMachineControl control,
+		EControlOpCode opCode,
+		IReadOnlyList<ushort> values)
+	{
+		switch (opCode)
+		{
+			case EControlOpCode.SetTargetedTimeInTwoHeartRateZones:
+				await control.SetTargetedTimeInTwoHeartRateZones(values[0], values[1]);
+				break;
+			case EControlOpCode.SetTargetedTimeInThreeHeartRateZones:
+				await control.SetTargetedTimeInThreeHeartRateZones(values[0], values[1], values[2]);
+				break;
+			case EControlOpCode.SetTargetedTimeInFiveHeartRateZones:
+				await control.SetTargetedTimeInFiveHeartRateZones(values[0], values[1], values[2], values[3], values[4]);
+				break;
+			default:
+				throw new InvalidOperationException($"Unhandled zone-time op code {opCode}");
 		}
 	}
 
@@ -484,6 +592,7 @@ public enum TargetValueShape
 	Byte,
 	UInt16,
 	Int16,
+	UInt24,
 }
 
 /// <summary>
@@ -591,8 +700,67 @@ public sealed partial class TargetValueItem : ControlItemViewModel
 		TargetValueShape.Byte => (byte.MinValue, byte.MaxValue),
 		TargetValueShape.UInt16 => (ushort.MinValue, ushort.MaxValue),
 		TargetValueShape.Int16 => (short.MinValue, short.MaxValue),
+		TargetValueShape.UInt24 => (UInt24.MinValue.Value, UInt24.MaxValue.Value),
 		_ => throw new ArgumentOutOfRangeException(nameof(this.Shape)),
 	};
+}
+
+/// <summary>
+/// A multi-value target-setting card (the two/three/five heart-rate zone times): renders one
+/// entry field per zone and sends all entered values in a single control request. Starts blank,
+/// has no advertised range, and tags itself when the machine does not advertise support.
+/// </summary>
+public sealed partial class MultiValueTargetItem : ControlItemViewModel
+{
+	private readonly Func<IFitnessMachineFeatures, bool> isSupported;
+
+	public MultiValueTargetItem(
+		string name,
+		string unit,
+		EControlOpCode opCode,
+		Func<IFitnessMachineFeatures, bool> isSupported,
+		ICommand command,
+		params string[] entryLabels)
+		: base(name)
+	{
+		this.Unit = unit;
+		this.OpCode = opCode;
+		this.isSupported = isSupported;
+		this.Command = command;
+		foreach (var label in entryLabels)
+			this.Entries.Add(new MultiValueTargetEntry(label));
+	}
+
+	public string Unit { get; }
+
+	public EControlOpCode OpCode { get; }
+
+	public override ICommand Command { get; }
+
+	public ObservableCollection<MultiValueTargetEntry> Entries { get; } = [];
+
+	[ObservableProperty]
+	public partial bool IsNotSupported { get; set; }
+
+	public void ApplyFeatures(IFitnessMachineFeatures? features)
+		=> this.IsNotSupported = features is not null && !this.isSupported(features);
+
+	/// <summary>Encodes a human-unit value into the raw ushort format.</summary>
+	public double Encode(double humanValue)
+		=> Math.Clamp(
+			Math.Round(humanValue, MidpointRounding.AwayFromZero),
+			ushort.MinValue,
+			ushort.MaxValue);
+}
+
+/// <summary>One entry field of a <see cref="MultiValueTargetItem"/>.</summary>
+public sealed partial class MultiValueTargetEntry(string label) : ObservableObject
+{
+	public string Label { get; } = label;
+
+	/// <summary>The human-unit value the user entered; survives reconnects because it lives here.</summary>
+	[ObservableProperty]
+	public partial string Value { get; set; } = string.Empty;
 }
 
 public sealed class ControlGroupViewModel(string title)

@@ -26,8 +26,8 @@ public partial class ControlPage : ContentPage
 }
 
 /// <summary>
-/// Picks the value-card template for <see cref="TargetValueItem"/>s and the plain button template
-/// for control operations.
+/// Picks the value-card template for <see cref="TargetValueItem"/>s and <see cref="MultiValueTargetItem"/>s
+/// and the plain button template for control operations.
 /// </summary>
 public sealed class ControlItemTemplateSelector : DataTemplateSelector
 {
@@ -35,6 +35,13 @@ public sealed class ControlItemTemplateSelector : DataTemplateSelector
 
 	public DataTemplate? ValueTemplate { get; set; }
 
+	public DataTemplate? MultiValueTemplate { get; set; }
+
 	protected override DataTemplate OnSelectTemplate(object item, BindableObject container)
-		=> item is TargetValueItem ? this.ValueTemplate! : this.OperationTemplate!;
+		=> item switch
+		{
+			TargetValueItem => this.ValueTemplate!,
+			MultiValueTargetItem => this.MultiValueTemplate!,
+			_ => this.OperationTemplate!,
+		};
 }
