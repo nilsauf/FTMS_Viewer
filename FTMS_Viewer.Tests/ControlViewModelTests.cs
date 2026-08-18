@@ -1,10 +1,11 @@
 namespace FTMS_Viewer.Tests;
 
-using CommunityToolkit.Mvvm.Input;
 using FTMS_Viewer.Pages;
 using FTMS_Viewer.Tests.Harness;
 using FTMS.NET;
 using Microsoft.Extensions.Logging;
+
+using static FTMS_Viewer.Tests.Harness.ControlPageTestHelpers;
 
 /// <summary>
 /// Tests for the Control page spine: control operations are sent as the correct bytes,
@@ -241,32 +242,5 @@ public sealed class ControlViewModelTests : TestBase
 		await SendAsync(vm.StopCommand, connection, [0x80, 0x08, 0x05]);
 
 		Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("rejected", StringComparison.OrdinalIgnoreCase));
-	}
-
-	private static void AssertWritten(FakeMachineServiceConnection connection, params byte[] expected)
-		=> Assert.Equal([expected], connection.ControlPoint.WrittenValues.ToArray());
-
-	private static async Task SendAsync(IAsyncRelayCommand command, FakeMachineServiceConnection connection, byte[] response)
-	{
-		Task sendTask = command.ExecuteAsync(null);
-		connection.ControlPoint.Feed(response);
-		await sendTask;
-	}
-
-	private static (ControlViewModel vm, FakeConnectionManager manager, FakeMachineServiceConnection connection, FakeToastService toasts, FakeLogger<ControlViewModel> logger) CreateConnectedViewModel()
-	{
-		var (vm, manager, connection, toasts, logger) = CreateViewModel();
-		manager.PushConnection(connection);
-		return (vm, manager, connection, toasts, logger);
-	}
-
-	private static (ControlViewModel vm, FakeConnectionManager manager, FakeMachineServiceConnection connection, FakeToastService toasts, FakeLogger<ControlViewModel> logger) CreateViewModel()
-	{
-		var manager = new FakeConnectionManager();
-		var connection = new FakeMachineServiceConnection();
-		var toasts = new FakeToastService();
-		var logger = new FakeLogger<ControlViewModel>();
-		var vm = new ControlViewModel(manager, logger, toasts);
-		return (vm, manager, connection, toasts, logger);
 	}
 }

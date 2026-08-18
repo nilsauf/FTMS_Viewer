@@ -12,6 +12,53 @@
 			<Setter Property="FontSize" Value="18" />
 			<Setter Property="CornerRadius" Value="12" />
 		</Style>
+
+		<DataTemplate x:Key="ControlOperationTemplate"
+					  x:DataType="l:ControlOperationItem">
+			<Button Text="{Binding Name}"
+					Command="{Binding Command}" />
+		</DataTemplate>
+
+		<DataTemplate x:Key="TargetValueTemplate"
+					  x:DataType="l:TargetValueItem">
+			<Border Stroke="Gray"
+					StrokeThickness="1"
+					StrokeShape="RoundRectangle 10,10,10,10"
+					Padding="12">
+				<VerticalStackLayout Spacing="8">
+					<HorizontalStackLayout Spacing="8">
+						<Label Text="{Binding Name}"
+							   FontSize="16"
+							   FontAttributes="Bold"
+							   VerticalOptions="Center" />
+						<Label Text="{Binding Unit}"
+							   FontSize="14"
+							   Opacity="0.6"
+							   VerticalOptions="Center" />
+						<Label Text="advertised as not supported"
+							   FontSize="12"
+							   TextColor="DarkOrange"
+							   VerticalOptions="Center"
+							   IsVisible="{Binding IsNotSupported}" />
+					</HorizontalStackLayout>
+					<HorizontalStackLayout Spacing="8">
+						<Entry Text="{Binding Value}"
+							   FontSize="16"
+							   WidthRequest="140"
+							   Placeholder="{Binding Name}"
+							   TextChanged="OnTargetValueTextChanged" />
+						<Button Text="Send"
+								Command="{Binding Command}"
+								FontSize="16"
+								HeightRequest="44" />
+					</HorizontalStackLayout>
+				</VerticalStackLayout>
+			</Border>
+		</DataTemplate>
+
+		<l:ControlItemTemplateSelector x:Key="ControlItemTemplateSelector"
+									   OperationTemplate="{StaticResource ControlOperationTemplate}"
+									   ValueTemplate="{StaticResource TargetValueTemplate}" />
 	</ContentPage.Resources>
 
 	<Grid RowDefinitions="Auto,Auto,*">
@@ -37,9 +84,18 @@
 				StrokeShape="RoundRectangle 10,10,10,10"
 				Padding="10"
 				Margin="10,0,10,10">
-			<Label Text="{Binding Status}"
-				   FontSize="16"
-				   HorizontalTextAlignment="Center" />
+			<VerticalStackLayout Spacing="6">
+				<Label Text="{Binding Status}"
+					   FontSize="16"
+					   HorizontalTextAlignment="Center" />
+				<HorizontalStackLayout HorizontalOptions="Center"
+									   Spacing="10">
+					<Label Text="Allow out of range"
+						   FontSize="14"
+						   VerticalOptions="Center" />
+					<Switch IsToggled="{Binding IsAllowOutOfRange}" />
+				</HorizontalStackLayout>
+			</VerticalStackLayout>
 		</Border>
 		<ScrollView Grid.Row="2">
 			<VerticalStackLayout Spacing="16"
@@ -52,14 +108,8 @@
 								   FontSize="22"
 								   FontAttributes="Bold" />
 							<VerticalStackLayout Spacing="8"
-												 BindableLayout.ItemsSource="{Binding Items}">
-								<BindableLayout.ItemTemplate>
-									<DataTemplate x:DataType="l:ControlItemViewModel">
-										<Button Text="{Binding Name}"
-												Command="{Binding Command}" />
-									</DataTemplate>
-								</BindableLayout.ItemTemplate>
-							</VerticalStackLayout>
+												 BindableLayout.ItemsSource="{Binding Items}"
+												 BindableLayout.ItemTemplateSelector="{StaticResource ControlItemTemplateSelector}" />
 						</VerticalStackLayout>
 					</DataTemplate>
 				</BindableLayout.ItemTemplate>

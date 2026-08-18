@@ -21,7 +21,42 @@ public sealed class FakeMachineServiceConnection : IFitnessMachineServiceConnect
 
 		foreach (var id in AllCharacteristicIds)
 			this.characteristics.Add(id, new FakeFitnessMachineCharacteristic(id));
+
+		this.Feature.ReadValue = DefaultFeatureData;
+		this[FtmsUuids.SupportedSpeedRange].ReadValue = DefaultSpeedRange;
+		this[FtmsUuids.SupportedInclinationRange].ReadValue = DefaultInclinationRange;
+		this[FtmsUuids.SupportedResistanceLevelRange].ReadValue = DefaultResistanceLevelRange;
+		this[FtmsUuids.SupportedPowerRange].ReadValue = DefaultPowerRange;
+		this[FtmsUuids.SupportedHeartRateRange].ReadValue = DefaultHeartRateRange;
 	}
+
+	/// <summary>
+	/// Advertises every target setting the Targets group sends (speed, incline, resistance level,
+	/// power, heart rate, cadence) as supported: the target-settings field is bits 0-4 set and
+	/// bit 16 (cadence) set, the measurement-features field is all zero.
+	/// </summary>
+	public static readonly byte[] DefaultFeatureData =
+		[0x00, 0x00, 0x00, 0x00, 0x1F, 0x00, 0x01];
+
+	/// <summary>Raw speed range: 1.0-25.0 km/h in 0.1 km/h increments.</summary>
+	public static readonly byte[] DefaultSpeedRange =
+		[0x64, 0x00, 0xC4, 0x09, 0x0A, 0x00];
+
+	/// <summary>Raw inclination range: -10.0-10.0 % in 0.5 % increments.</summary>
+	public static readonly byte[] DefaultInclinationRange =
+		[0x9C, 0xFF, 0x64, 0x00, 0x05, 0x00];
+
+	/// <summary>Raw resistance-level range: 1-40 in steps of 1.</summary>
+	public static readonly byte[] DefaultResistanceLevelRange =
+		[0x01, 0x28, 0x01];
+
+	/// <summary>Raw power range: 20-1000 W in 5 W increments.</summary>
+	public static readonly byte[] DefaultPowerRange =
+		[0x14, 0x00, 0xE8, 0x03, 0x05, 0x00];
+
+	/// <summary>Raw heart-rate range: 60-220 bpm in 1 bpm increments.</summary>
+	public static readonly byte[] DefaultHeartRateRange =
+		[0x3C, 0xDC, 0x01];
 
 	public EFitnessMachineType MachineType { get; }
 

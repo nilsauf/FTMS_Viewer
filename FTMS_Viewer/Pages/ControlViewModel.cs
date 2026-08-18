@@ -1,6 +1,7 @@
 ﻿namespace FTMS_Viewer.Pages;
 
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Windows.Input;
@@ -11,6 +12,7 @@ using CommunityToolkit.Mvvm.Input;
 using FTMS.NET;
 using FTMS.NET.Control;
 using FTMS.NET.Exceptions;
+using FTMS.NET.Features;
 using FTMS.NET.State;
 
 using Microsoft.Extensions.Logging;
@@ -39,6 +41,9 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	private readonly IToastService toastService;
 	private readonly IDisposable cleanUp;
 	private readonly CompositeDisposable currentProviderSubscriptions = new();
+	private readonly List<TargetValueItem> targetValueItems = [];
+	private readonly List<IAsyncRelayCommand> targetValueCommands = [];
+	private IFitnessMachineFeatures? features;
 
 	[ObservableProperty]
 	[NotifyPropertyChangedFor(nameof(IsConnected))]
@@ -48,6 +53,12 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	[NotifyCanExecuteChangedFor(nameof(StopCommand))]
 	[NotifyCanExecuteChangedFor(nameof(PauseCommand))]
 	private partial IFitnessMachineControl? Control { get; set; }
+
+	partial void OnControlChanged(IFitnessMachineControl? value)
+	{
+		foreach (var command in this.targetValueCommands)
+			command.NotifyCanExecuteChanged();
+	}
 
 	public bool IsConnected => this.Control is not null;
 
@@ -73,6 +84,14 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	[ObservableProperty]
 	public partial string Status { get; private set; } = NotConnected;
 
+	/// <summary>
+	/// When false (the default), an entered value is clamped to the machine's advertised range and
+	/// snapped to its increment before sending; when true, the value is sent exactly as entered.
+	/// Only applies to the ranged target settings.
+	/// </summary>
+	[ObservableProperty]
+	public partial bool IsAllowOutOfRange { get; set; }
+
 	public ObservableCollection<ControlGroupViewModel> ControlGroups { get; } = [];
 
 	public ControlViewModel(
@@ -94,7 +113,7 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 				ex => this.LogErrorObservingCurrentServiceConnection(ex));
 	}
 
-	private async Task<(IFitnessMachineControl Control, IFitnessMachineStateProvider Provider)?> CreateSessionAsync(
+	private async Task<(IFitnessMachineControl Control, IFitnessMachineStateProvider Provider, IFitnessMachineFeatures? Features)?> CreateSessionAsync(
 		IFitnessMachineServiceConnection? connection)
 	{
 		if (connection is null)
@@ -102,10 +121,24 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 
 		IFitnessMachineControl control = await connection.CreateFitnessMachineControlAsync();
 		IFitnessMachineStateProvider provider = await connection.CreateFitnessMachineStateProviderAsync();
-		return (control, provider);
+		IFitnessMachineFeatures? features = await TryReadFeaturesAsync(connection);
+		return (control, provider, features);
 	}
 
-	private void HandleSession((IFitnessMachineControl Control, IFitnessMachineStateProvider Provider)? session)
+	private async Task<IFitnessMachineFeatures?> TryReadFeaturesAsync(IFitnessMachineServiceConnection connection)
+	{
+		try
+		{
+			return await connection.ReadFitnessMachineFeaturesAsync();
+		}
+		catch (Exception ex)
+		{
+			this.LogFailedToReadFeatures(ex);
+			return null;
+		}
+	}
+
+	private void HandleSession((IFitnessMachineControl Control, IFitnessMachineStateProvider Provider, IFitnessMachineFeatures? Features)? session)
 	{
 		this.ResetPageState();
 
@@ -113,6 +146,8 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 			return;
 
 		this.Control = s.Control;
+		this.features = s.Features;
+		this.ApplyFeatures();
 		this.Status = string.Empty;
 
 		this.currentProviderSubscriptions.Add(
@@ -128,8 +163,42 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 			this.Permission = ControlPermission.Lost;
 			this.Status = "Control permission lost";
 			this.LogControlPermissionLost();
+			return;
+		}
+
+		this.PrefillTarget(state);
+	}
+
+	private void PrefillTarget(IFitnessMachineState state)
+	{
+		TargetValueItem? item = this.targetValueItems
+			.FirstOrDefault(i => i.PrefillOpCode == state.OpCode);
+		if (item is null || item.IsDirty)
+			return;
+
+		var parameter = ReadFirstParameter(state);
+		if (parameter is null)
+			return;
+
+		item.Prefill(FormatValue(parameter.Value));
+	}
+
+	private static FitnessMachineStateParameter? ReadFirstParameter(IFitnessMachineState state)
+	{
+		try
+		{
+			return state.ReadParameters()
+				.OfType<FitnessMachineStateParameter>()
+				.FirstOrDefault();
+		}
+		catch (KeyNotFoundException)
+		{
+			return null;
 		}
 	}
+
+	private static string FormatValue(double value)
+		=> value.ToString("0.###", CultureInfo.InvariantCulture);
 
 	private void HandleMachineStateError(Exception ex)
 	{
@@ -151,40 +220,108 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 		controlGroup.Items.Add(new ControlOperationItem("Stop", this.StopCommand));
 		controlGroup.Items.Add(new ControlOperationItem("Pause", this.PauseCommand));
 		this.ControlGroups.Add(controlGroup);
+
+		var targetsGroup = new ControlGroupViewModel("Targets");
+		targetsGroup.Items.Add(this.CreateTargetValueItem("Target Speed", "km/h", EControlOpCode.SetTargetSpeed, EStateOpCode.TargetSpeedChanged, 100, TargetValueShape.UInt16,
+			f => f.SpeedTargetSettingSupported, f => f.SpeedRange));
+		targetsGroup.Items.Add(this.CreateTargetValueItem("Target Incline", "%", EControlOpCode.SetTargetInclination, EStateOpCode.TargetInclineChanged, 10, TargetValueShape.Int16,
+			f => f.InclinationTargetSettingSupported, f => f.InclinationRange));
+		targetsGroup.Items.Add(this.CreateTargetValueItem("Target Resistance Level", string.Empty, EControlOpCode.SetTargetResistanceLevel, EStateOpCode.TargetResistanceLevelChanged, 1, TargetValueShape.Byte,
+			f => f.ResistanceTargetSettingSupported, f => f.ResistanceLevelRange));
+		targetsGroup.Items.Add(this.CreateTargetValueItem("Target Power", "W", EControlOpCode.SetTargetPower, EStateOpCode.TargetPowerChanged, 1, TargetValueShape.Int16,
+			f => f.PowerTargetSettingSupported, f => f.PowerRange));
+		targetsGroup.Items.Add(this.CreateTargetValueItem("Target Heart Rate", "bpm", EControlOpCode.SetTargetHeartRate, EStateOpCode.TargetHeartRateChanged, 1, TargetValueShape.Byte,
+			f => f.HeartRateTargetSettingSupported, f => f.HeartRateRange));
+		targetsGroup.Items.Add(this.CreateTargetValueItem("Target Cadence", "rpm", EControlOpCode.SetTargetedCadence, EStateOpCode.TargetedCadenceChanged, 2, TargetValueShape.UInt16,
+			f => f.TargetedCadenceConfigurationSupported, f => null));
+		this.ControlGroups.Add(targetsGroup);
+	}
+
+	private TargetValueItem CreateTargetValueItem(
+		string name,
+		string unit,
+		EControlOpCode opCode,
+		EStateOpCode prefillOpCode,
+		double factor,
+		TargetValueShape shape,
+		Func<IFitnessMachineFeatures, bool> isSupported,
+		Func<IFitnessMachineFeatures, ISupportedRange?> getRange)
+	{
+		TargetValueItem? item = null;
+		var command = new AsyncRelayCommand(
+			() => this.SendTargetValueAsync(item!),
+			this.CanSendRequest);
+		item = new TargetValueItem(
+			name, unit, opCode, prefillOpCode, factor, shape, isSupported, getRange, command);
+		this.targetValueItems.Add(item);
+		this.targetValueCommands.Add(command);
+		return item;
+	}
+
+	private void ApplyFeatures()
+	{
+		foreach (var item in this.targetValueItems)
+			item.ApplyFeatures(this.features);
 	}
 
 	private bool CanSendRequest() => this.IsConnected;
 
 	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private Task RequestControlAsync()
-		=> this.SendOperationAsync("Request Control", EControlOpCode.RequestControl, this.Control!.RequestControl);
+		=> this.SendRequestAsync("Request Control", EControlOpCode.RequestControl, this.Control!.RequestControl);
 
 	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private Task ResetAsync()
-		=> this.SendOperationAsync("Reset", EControlOpCode.Reset, this.Control!.Reset);
+		=> this.SendRequestAsync("Reset", EControlOpCode.Reset, this.Control!.Reset);
 
 	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private Task StartOrResumeAsync()
-		=> this.SendOperationAsync("Start/Resume", EControlOpCode.StartOrResume, this.Control!.StartOrResume);
+		=> this.SendRequestAsync("Start/Resume", EControlOpCode.StartOrResume, this.Control!.StartOrResume);
 
 	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private Task StopAsync()
-		=> this.SendOperationAsync("Stop", EControlOpCode.StopOrPause, this.Control!.Stop);
+		=> this.SendRequestAsync("Stop", EControlOpCode.StopOrPause, this.Control!.Stop);
 
 	[RelayCommand(CanExecute = nameof(CanSendRequest))]
 	private Task PauseAsync()
-		=> this.SendOperationAsync("Pause", EControlOpCode.StopOrPause, this.Control!.Pause);
+		=> this.SendRequestAsync("Pause", EControlOpCode.StopOrPause, this.Control!.Pause);
 
-	private async Task SendOperationAsync(
+	private async Task SendTargetValueAsync(TargetValueItem item)
+	{
+		if (!double.TryParse(item.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double humanValue))
+		{
+			this.LogInvalidTargetValue(item.Name, item.Value);
+			string message = $"{item.Name}: Invalid value";
+			this.Status = message;
+			await this.toastService.ShowAsync(message);
+			return;
+		}
+
+		if (this.IsAllowOutOfRange is false && item.Range is { } range)
+			humanValue = ClampAndSnap(range, humanValue);
+
+		double rawValue = item.Encode(humanValue);
+
+		await this.SendRequestAsync(
+			item.Name,
+			item.OpCode,
+			() => SendTargetSettingAsync(this.Control!, item.OpCode, rawValue),
+			() => item.IsDirty = false);
+	}
+
+	private async Task SendRequestAsync(
 		string name,
 		EControlOpCode opCode,
-		Func<Task> send)
+		Func<Task> send,
+		Action? onSuccess = null)
 	{
 		this.LogSendingControlRequest(opCode);
 
 		try
 		{
 			await send();
+
+			onSuccess?.Invoke();
 
 			this.Status = $"{name}: Success";
 			if (opCode == EControlOpCode.RequestControl)
@@ -211,6 +348,47 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 			this.LogErrorExecutingCommand(name, ex);
 			await this.ShowFailureAsync(name);
 		}
+	}
+
+	private static async Task SendTargetSettingAsync(
+		IFitnessMachineControl control,
+		EControlOpCode opCode,
+		double rawValue)
+	{
+		switch (opCode)
+		{
+			case EControlOpCode.SetTargetSpeed:
+				await control.SetTargetSpeed((ushort)rawValue);
+				break;
+			case EControlOpCode.SetTargetInclination:
+				await control.SetTargetInclination((short)rawValue);
+				break;
+			case EControlOpCode.SetTargetResistanceLevel:
+				await control.SetTargetResistanceLevel((byte)rawValue);
+				break;
+			case EControlOpCode.SetTargetPower:
+				await control.SetTargetPower((short)rawValue);
+				break;
+			case EControlOpCode.SetTargetHeartRate:
+				await control.SetTargetHeartRate((byte)rawValue);
+				break;
+			case EControlOpCode.SetTargetedCadence:
+				await control.SetTargetedCadence((ushort)rawValue);
+				break;
+			default:
+				throw new InvalidOperationException($"Unhandled target-setting op code {opCode}");
+		}
+	}
+
+	private static double ClampAndSnap(ISupportedRange range, double value)
+	{
+		double clamped = Math.Clamp(value, range.MinimumValue, range.MaximumValue);
+		if (range.MinimumIncrement <= 0)
+			return clamped;
+
+		double snapped = range.MinimumValue
+			+ Math.Round((clamped - range.MinimumValue) / range.MinimumIncrement) * range.MinimumIncrement;
+		return Math.Clamp(snapped, range.MinimumValue, range.MaximumValue);
 	}
 
 	private async Task ShowFailureAsync(string name)
@@ -243,6 +421,8 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 		this.Control = null;
 		this.Status = NotConnected;
 		this.Permission = ControlPermission.NotRequested;
+		this.features = null;
+		this.ApplyFeatures();
 		this.currentProviderSubscriptions.Clear();
 	}
 
@@ -260,6 +440,12 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 
 	[LoggerMessage(LogLevel.Debug, "Control request with op code {OpCode} succeeded")]
 	private partial void LogControlRequestSucceeded(EControlOpCode opCode);
+
+	[LoggerMessage(LogLevel.Warning, "Could not send the {Name} target setting: '{Value}' is not a valid number")]
+	private partial void LogInvalidTargetValue(string name, string value);
+
+	[LoggerMessage(LogLevel.Error, "Failed to read the machine's advertised features; target settings will not be tagged or range-validated.")]
+	private partial void LogFailedToReadFeatures(Exception ex);
 
 	[LoggerMessage(LogLevel.Warning, "Control request with op code {OpCode} was rejected with result code {ResultCode}")]
 	private partial void LogControlRequestRejected(EControlOpCode opCode, EControlResultCode resultCode);
@@ -280,7 +466,7 @@ public sealed partial class ControlViewModel : ObservableObject, IDisposable
 	private partial void LogErrorExecutingCommand(string commandName, Exception ex);
 }
 
-public abstract class ControlItemViewModel(string name)
+public abstract class ControlItemViewModel(string name) : ObservableObject
 {
 	public string Name { get; } = name;
 
@@ -290,6 +476,123 @@ public abstract class ControlItemViewModel(string name)
 public sealed class ControlOperationItem(string name, ICommand command) : ControlItemViewModel(name)
 {
 	public override ICommand Command { get; } = command;
+}
+
+/// <summary>The raw numeric width a target-setting value is encoded into at send time.</summary>
+public enum TargetValueShape
+{
+	Byte,
+	UInt16,
+	Int16,
+}
+
+/// <summary>
+/// A single-value target-setting card: accepts a human-unit value, encodes it to the machine's
+/// raw format at send time, clamps and snaps it against the advertised range unless the
+/// "allow out of range" toggle is on, prefills from the machine's current target unless the
+/// field is being edited, and tags itself when the machine does not advertise support.
+/// </summary>
+public sealed partial class TargetValueItem : ControlItemViewModel
+{
+	private readonly Func<IFitnessMachineFeatures, ISupportedRange?> getRange;
+	private readonly Func<IFitnessMachineFeatures, bool> isSupported;
+
+	public TargetValueItem(
+		string name,
+		string unit,
+		EControlOpCode opCode,
+		EStateOpCode prefillOpCode,
+		double factor,
+		TargetValueShape shape,
+		Func<IFitnessMachineFeatures, bool> isSupported,
+		Func<IFitnessMachineFeatures, ISupportedRange?> getRange,
+		ICommand command)
+		: base(name)
+	{
+		this.Unit = unit;
+		this.OpCode = opCode;
+		this.PrefillOpCode = prefillOpCode;
+		this.Factor = factor;
+		this.Shape = shape;
+		this.isSupported = isSupported;
+		this.getRange = getRange;
+		this.Command = command;
+	}
+
+	public string Unit { get; }
+
+	public EControlOpCode OpCode { get; }
+
+	public EStateOpCode PrefillOpCode { get; }
+
+	public double Factor { get; }
+
+	public TargetValueShape Shape { get; }
+
+	public override ICommand Command { get; }
+
+	/// <summary>The machine's advertised range for this setting, or null when it advertises none.</summary>
+	public ISupportedRange? Range { get; private set; }
+
+	/// <summary>The human-unit value the user entered; survives reconnects because it lives here.</summary>
+	[ObservableProperty]
+	public partial string Value { get; set; } = string.Empty;
+
+	/// <summary>
+	/// Set while the user is editing the field, so machine-state prefill does not clobber the
+	/// entry; cleared by a successful send so the machine's echo re-arms the field.
+	/// </summary>
+	[ObservableProperty]
+	public partial bool IsDirty { get; set; }
+
+	[ObservableProperty]
+	public partial bool IsNotSupported { get; set; }
+
+	private bool prefillGuard;
+
+	/// <summary>Marks the field dirty unless the change came from a prefill.</summary>
+	public void MarkDirty()
+	{
+		if (this.prefillGuard)
+			return;
+
+		this.IsDirty = true;
+	}
+
+	/// <summary>Applies a machine-state value without counting it as a user edit.</summary>
+	public void Prefill(string value)
+	{
+		this.prefillGuard = true;
+		try
+		{
+			this.Value = value;
+		}
+		finally
+		{
+			this.prefillGuard = false;
+		}
+	}
+
+	public void ApplyFeatures(IFitnessMachineFeatures? features)
+	{
+		this.Range = features is null ? null : this.getRange(features);
+		this.IsNotSupported = features is not null && !this.isSupported(features);
+	}
+
+	/// <summary>Encodes a human-unit value into the raw format, bounded by the raw type.</summary>
+	public double Encode(double humanValue)
+		=> Math.Clamp(
+			Math.Round(humanValue * this.Factor, MidpointRounding.AwayFromZero),
+			this.GetRawBounds().Min,
+			this.GetRawBounds().Max);
+
+	private (double Min, double Max) GetRawBounds() => this.Shape switch
+	{
+		TargetValueShape.Byte => (byte.MinValue, byte.MaxValue),
+		TargetValueShape.UInt16 => (ushort.MinValue, ushort.MaxValue),
+		TargetValueShape.Int16 => (short.MinValue, short.MaxValue),
+		_ => throw new ArgumentOutOfRangeException(nameof(this.Shape)),
+	};
 }
 
 public sealed class ControlGroupViewModel(string title)
