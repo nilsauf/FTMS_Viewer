@@ -6,4 +6,5 @@
   <Project Path="FTMS_Viewer/FTMS_Viewer.csproj">
     <Deploy Solution="Debug|*" />
   </Project>
+  <Project Path="FTMS_Viewer.Tests/FTMS_Viewer.Tests.csproj" />
 </Solution>
