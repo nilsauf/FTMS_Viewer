@@ -3,7 +3,6 @@
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 
-using CommunityToolkit.Maui.Alerts;
 using CommunityToolkit.Mvvm.Input;
 
 using DynamicData.Binding;
@@ -15,11 +14,16 @@ public sealed partial class FlyoutDebugLogViewModel : IDisposable
 	public readonly IDisposable cleanUp;
 	public readonly BooleanDisposable disposedFlag = new();
 	public readonly Lock @lock = new();
+    private readonly IToastService toastService;
 
-	public ObservableCollectionExtended<DebugLogItem> Items { get; } = [];
+    public ObservableCollectionExtended<DebugLogItem> Items { get; } = [];
 
-	public FlyoutDebugLogViewModel(IDebugPageLogProvider debugPageLogProvider)
+	public FlyoutDebugLogViewModel(
+		IDebugPageLogProvider debugPageLogProvider,
+		IToastService toastService)
 	{
+		this.toastService = toastService;
+
 		this.cleanUp = debugPageLogProvider.ObserveLogItems()
 			.ObserveOn(SynchronizationContext.Current!)
 			.Subscribe(item =>
@@ -37,21 +41,17 @@ public sealed partial class FlyoutDebugLogViewModel : IDisposable
 					}
 				}
 			});
-	}
+    }
 
 	[RelayCommand(CanExecute = nameof(CanShowToast))]
-	private static Task ShowItemsToastAsync(DebugLogItem item)
+	private Task ShowItemsToastAsync(DebugLogItem item)
 	{
-#if !WINDOWS
 		string message = $"{item.LogLevel} - {item.Category}";
 		if (string.IsNullOrWhiteSpace(item.ExceptionName) is false)
 		{
 			message += $"\n{item.ExceptionMessage}";
 		}
-		return Toast.Make(message).Show();
-#else
-		return Task.CompletedTask;
-#endif
+		return this.toastService.ShowAsync(message);
 	}
 
 	private static bool CanShowToast(DebugLogItem item)
